@@ -5,6 +5,7 @@ import {
 } from "@/generated/prisma/client";
 import { AppError } from "@/utils/app-error";
 import { ResponseFormatter } from "@/utils/response";
+import { CandidateLeadService } from "@/services/candidate-leads.service";
 
 const candidateLeadService = new CandidateLeadService();
 
