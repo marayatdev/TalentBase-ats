@@ -1,0 +1,462 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+model ai_resume_results {
+  id             BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  resume_id      BigInt    @unique(map: "uk_ai_resume_result_resume") @db.UnsignedBigInt
+  extracted_text String?   @db.LongText
+  summary        String?   @db.Text
+  parsed_data    Json?
+  model_name     String?   @db.VarChar(100)
+  error_message  String?   @db.Text
+  processed_at   DateTime? @db.Timestamp(0)
+  created_at     DateTime  @default(now()) @db.Timestamp(0)
+  resumes        resumes   @relation(fields: [resume_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_ai_resume_results_resume")
+}
+
+model application_stage_histories {
+  id                                                                         BigInt           @id @default(autoincrement()) @db.UnsignedBigInt
+  application_id                                                             BigInt           @db.UnsignedBigInt
+  from_stage_id                                                              BigInt?          @db.UnsignedBigInt
+  to_stage_id                                                                BigInt           @db.UnsignedBigInt
+  changed_by                                                                 BigInt?          @db.UnsignedBigInt
+  note                                                                       String?          @db.Text
+  changed_at                                                                 DateTime         @default(now()) @db.Timestamp(0)
+  applications                                                               applications     @relation(fields: [application_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_stage_history_application")
+  pipeline_stages_application_stage_histories_from_stage_idTopipeline_stages pipeline_stages? @relation("application_stage_histories_from_stage_idTopipeline_stages", fields: [from_stage_id], references: [id], onUpdate: NoAction, map: "fk_stage_history_from_stage")
+  pipeline_stages_application_stage_histories_to_stage_idTopipeline_stages   pipeline_stages  @relation("application_stage_histories_to_stage_idTopipeline_stages", fields: [to_stage_id], references: [id], onUpdate: NoAction, map: "fk_stage_history_to_stage")
+  users                                                                      users?           @relation(fields: [changed_by], references: [id], onUpdate: NoAction, map: "fk_stage_history_user")
+
+  @@index([from_stage_id], map: "fk_stage_history_from_stage")
+  @@index([to_stage_id], map: "fk_stage_history_to_stage")
+  @@index([changed_by], map: "fk_stage_history_user")
+  @@index([application_id], map: "idx_stage_history_application")
+}
+
+model applications {
+  id                          BigInt                        @id @default(autoincrement()) @db.UnsignedBigInt
+  candidate_id                BigInt                        @db.UnsignedBigInt
+  job_id                      BigInt                        @db.UnsignedBigInt
+  resume_id                   BigInt?                       @db.UnsignedBigInt
+  current_stage_id            BigInt?                       @db.UnsignedBigInt
+  assigned_hr_id              BigInt?                       @db.UnsignedBigInt
+  ai_match_score              Decimal?                      @db.Decimal(5, 2)
+  ai_match_summary            String?                       @db.Text
+  status                      applications_status           @default(active)
+  applied_at                  DateTime                      @default(now()) @db.Timestamp(0)
+  updated_at                  DateTime                      @default(now()) @db.Timestamp(0)
+  application_stage_histories application_stage_histories[]
+  candidates                  candidates                    @relation(fields: [candidate_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_applications_candidate")
+  users                       users?                        @relation(fields: [assigned_hr_id], references: [id], onUpdate: NoAction, map: "fk_applications_hr")
+  jobs                        jobs                          @relation(fields: [job_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_applications_job")
+  resumes                     resumes?                      @relation(fields: [resume_id], references: [id], onUpdate: NoAction, map: "fk_applications_resume")
+  pipeline_stages             pipeline_stages?              @relation(fields: [current_stage_id], references: [id], onUpdate: NoAction, map: "fk_applications_stage")
+  candidate_imports           candidate_imports[]
+  candidate_leads             candidate_leads[]
+  interviews                  interviews[]
+
+  @@unique([candidate_id, job_id], map: "uk_candidate_job")
+  @@index([assigned_hr_id], map: "fk_applications_hr")
+  @@index([resume_id], map: "fk_applications_resume")
+  @@index([job_id], map: "idx_applications_job")
+  @@index([current_stage_id], map: "idx_applications_stage")
+  @@index([status], map: "idx_applications_status")
+}
+
+model candidate_skills {
+  candidate_id     BigInt                        @db.UnsignedBigInt
+  skill_id         BigInt                        @db.UnsignedBigInt
+  experience_years Decimal?                      @db.Decimal(4, 1)
+  proficiency      candidate_skills_proficiency?
+  candidates       candidates                    @relation(fields: [candidate_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_candidate_skills_candidate")
+  skills           skills                        @relation(fields: [skill_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_candidate_skills_skill")
+
+  @@id([candidate_id, skill_id])
+  @@index([skill_id], map: "fk_candidate_skills_skill")
+}
+
+model candidates {
+  id                     BigInt                   @id @default(autoincrement()) @db.UnsignedBigInt
+  full_name              String                   @db.VarChar(150)
+  email                  String?                  @db.VarChar(255)
+  phone                  String?                  @db.VarChar(30)
+  linkedin_url           String?                  @db.VarChar(500)
+  current_position       String?                  @db.VarChar(150)
+  total_experience_years Decimal                  @default(0.0) @db.Decimal(4, 1)
+  source                 candidates_source        @default(manual)
+  source_url             String?                  @db.VarChar(1000)
+  created_at             DateTime                 @default(now()) @db.Timestamp(0)
+  updated_at             DateTime                 @default(now()) @db.Timestamp(0)
+  applications           applications[]
+  candidate_certificates candidate_certificates[]
+  candidate_educations   candidate_educations[]
+  candidate_experiences  candidate_experiences[]
+  candidate_imports      candidate_imports[]
+  candidate_languages    candidate_languages[]
+  candidate_leads        candidate_leads[]
+  candidate_skills       candidate_skills[]
+  resumes                resumes[]
+
+  @@index([email], map: "idx_candidates_email")
+  @@index([full_name], map: "idx_candidates_name")
+  @@index([phone], map: "idx_candidates_phone")
+}
+
+model job_skills {
+  job_id      BigInt  @db.UnsignedBigInt
+  skill_id    BigInt  @db.UnsignedBigInt
+  is_required Boolean @default(true)
+  weight      Decimal @default(1.00) @db.Decimal(5, 2)
+  jobs        jobs    @relation(fields: [job_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_job_skills_job")
+  skills      skills  @relation(fields: [skill_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_job_skills_skill")
+
+  @@id([job_id, skill_id])
+  @@index([skill_id], map: "fk_job_skills_skill")
+}
+
+model jobs {
+  id                       BigInt               @id @default(autoincrement()) @db.UnsignedBigInt
+  title                    String               @db.VarChar(150)
+  description              String?              @db.Text
+  requirements             String?              @db.Text
+  employment_type          jobs_employment_type @default(full_time)
+  minimum_experience_years Decimal              @default(0.0) @db.Decimal(4, 1)
+  salary_min               Decimal?             @db.Decimal(12, 2)
+  salary_max               Decimal?             @db.Decimal(12, 2)
+  number_of_positions      Int                  @default(1) @db.UnsignedInt
+  status                   jobs_status          @default(open)
+  created_by               BigInt?              @db.UnsignedBigInt
+  created_at               DateTime             @default(now()) @db.Timestamp(0)
+  updated_at               DateTime             @default(now()) @db.Timestamp(0)
+  applications             applications[]
+  candidate_imports        candidate_imports[]
+  candidate_leads          candidate_leads[]
+  job_skills               job_skills[]
+  users                    users?               @relation(fields: [created_by], references: [id], onUpdate: NoAction, map: "fk_jobs_created_by")
+  pipeline_stages          pipeline_stages[]
+
+  @@index([created_by], map: "fk_jobs_created_by")
+}
+
+model pipeline_stages {
+  id                                                                                     BigInt                        @id @default(autoincrement()) @db.UnsignedBigInt
+  job_id                                                                                 BigInt                        @db.UnsignedBigInt
+  name                                                                                   String                        @db.VarChar(100)
+  stage_order                                                                            Int                           @db.UnsignedInt
+  stage_type                                                                             pipeline_stages_stage_type    @default(active)
+  created_at                                                                             DateTime                      @default(now()) @db.Timestamp(0)
+  application_stage_histories_application_stage_histories_from_stage_idTopipeline_stages application_stage_histories[] @relation("application_stage_histories_from_stage_idTopipeline_stages")
+  application_stage_histories_application_stage_histories_to_stage_idTopipeline_stages   application_stage_histories[] @relation("application_stage_histories_to_stage_idTopipeline_stages")
+  applications                                                                           applications[]
+  jobs                                                                                   jobs                          @relation(fields: [job_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_pipeline_stages_job")
+
+  @@unique([job_id, name], map: "uk_job_stage_name")
+  @@unique([job_id, stage_order], map: "uk_job_stage_order")
+}
+
+model resumes {
+  id                 BigInt               @id @default(autoincrement()) @db.UnsignedBigInt
+  candidate_id       BigInt               @db.UnsignedBigInt
+  original_file_name String               @db.VarChar(255)
+  file_url           String               @db.VarChar(1000)
+  mime_type          String?              @db.VarChar(100)
+  file_size          BigInt?              @db.UnsignedBigInt
+  is_primary         Boolean              @default(false)
+  parse_status       resumes_parse_status @default(pending)
+  uploaded_at        DateTime             @default(now()) @db.Timestamp(0)
+  ai_resume_results  ai_resume_results?
+  applications       applications[]
+  candidates         candidates           @relation(fields: [candidate_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_resumes_candidate")
+
+  @@index([candidate_id], map: "idx_resumes_candidate")
+}
+
+model skills {
+  id               BigInt             @id @default(autoincrement()) @db.UnsignedBigInt
+  name             String             @unique(map: "name") @db.VarChar(100)
+  created_at       DateTime           @default(now()) @db.Timestamp(0)
+  candidate_skills candidate_skills[]
+  job_skills       job_skills[]
+}
+
+model users {
+  id                          BigInt                        @id @default(autoincrement()) @db.UnsignedBigInt
+  name                        String                        @db.VarChar(150)
+  email                       String                        @unique(map: "email") @db.VarChar(255)
+  password                    String                        @db.VarChar(255)
+  role                        users_role                    @default(hr)
+  is_active                   Int                           @default(1)
+  created_at                  DateTime                      @default(now()) @db.Timestamp(0)
+  updated_at                  DateTime                      @default(now()) @db.Timestamp(0)
+  application_stage_histories application_stage_histories[]
+  applications                applications[]
+  candidate_imports           candidate_imports[]
+  candidate_leads             candidate_leads[]
+  googleAccounts              google_accounts?
+  interviews                  interviews[]
+  jobs                        jobs[]
+}
+
+model candidate_certificates {
+  id                   BigInt     @id @default(autoincrement()) @db.UnsignedBigInt
+  candidate_id         BigInt     @db.UnsignedBigInt
+  name                 String     @db.VarChar(255)
+  issuing_organization String?    @db.VarChar(255)
+  issue_date           String?    @db.VarChar(7)
+  expiration_date      String?    @db.VarChar(7)
+  credential_id        String?    @db.VarChar(255)
+  credential_url       String?    @db.VarChar(1000)
+  created_at           DateTime   @default(now()) @db.Timestamp(0)
+  updated_at           DateTime   @default(now()) @db.Timestamp(0)
+  candidates           candidates @relation(fields: [candidate_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_candidate_certificates_candidate")
+
+  @@index([candidate_id], map: "idx_candidate_certificates_candidate_id")
+  @@index([name], map: "idx_candidate_certificates_name")
+  @@index([issuing_organization], map: "idx_candidate_certificates_organization")
+}
+
+model candidate_educations {
+  id             BigInt     @id @default(autoincrement()) @db.UnsignedBigInt
+  candidate_id   BigInt     @db.UnsignedBigInt
+  institution    String     @db.VarChar(255)
+  degree         String?    @db.VarChar(255)
+  field_of_study String?    @db.VarChar(255)
+  start_year     Int?       @db.Year
+  end_year       Int?       @db.Year
+  created_at     DateTime   @default(now()) @db.Timestamp(0)
+  updated_at     DateTime   @default(now()) @db.Timestamp(0)
+  candidates     candidates @relation(fields: [candidate_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_candidate_educations_candidate")
+
+  @@index([candidate_id], map: "idx_candidate_educations_candidate_id")
+  @@index([field_of_study], map: "idx_candidate_educations_field_of_study")
+  @@index([institution], map: "idx_candidate_educations_institution")
+}
+
+model candidate_experiences {
+  id           BigInt     @id @default(autoincrement()) @db.UnsignedBigInt
+  candidate_id BigInt     @db.UnsignedBigInt
+  company      String     @db.VarChar(255)
+  position     String     @db.VarChar(255)
+  start_date   String?    @db.VarChar(7)
+  end_date     String?    @db.VarChar(7)
+  is_current   Boolean    @default(false)
+  description  String?    @db.Text
+  created_at   DateTime   @default(now()) @db.Timestamp(0)
+  updated_at   DateTime   @default(now()) @db.Timestamp(0)
+  candidates   candidates @relation(fields: [candidate_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_candidate_experiences_candidate")
+
+  @@index([candidate_id], map: "idx_candidate_experiences_candidate_id")
+  @@index([company], map: "idx_candidate_experiences_company")
+  @@index([position], map: "idx_candidate_experiences_position")
+}
+
+model candidate_languages {
+  id           BigInt     @id @default(autoincrement()) @db.UnsignedBigInt
+  candidate_id BigInt     @db.UnsignedBigInt
+  language     String     @db.VarChar(100)
+  level        String?    @db.VarChar(100)
+  created_at   DateTime   @default(now()) @db.Timestamp(0)
+  updated_at   DateTime   @default(now()) @db.Timestamp(0)
+  candidates   candidates @relation(fields: [candidate_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_candidate_languages_candidate")
+
+  @@unique([candidate_id, language], map: "uk_candidate_language")
+  @@index([candidate_id], map: "idx_candidate_languages_candidate_id")
+  @@index([language], map: "idx_candidate_languages_language")
+}
+
+model candidate_imports {
+  id             BigInt                          @id @default(autoincrement()) @db.UnsignedBigInt
+  candidate_id   BigInt?                         @db.UnsignedBigInt
+  application_id BigInt?                         @db.UnsignedBigInt
+  job_id         BigInt?                         @db.UnsignedBigInt
+  imported_by    BigInt?                         @db.UnsignedBigInt
+  source         candidate_imports_source        @default(manual)
+  source_url     String?                         @db.VarChar(1000)
+  raw_text       String?                         @db.LongText
+  raw_data       Json?
+  import_status  candidate_imports_import_status @default(pending)
+  error_message  String?                         @db.Text
+  created_at     DateTime                        @default(now()) @db.Timestamp(0)
+  updated_at     DateTime                        @default(now()) @db.Timestamp(0)
+  applications   applications?                   @relation(fields: [application_id], references: [id], onUpdate: NoAction, map: "fk_candidate_imports_application")
+  candidates     candidates?                     @relation(fields: [candidate_id], references: [id], onUpdate: NoAction, map: "fk_candidate_imports_candidate")
+  jobs           jobs?                           @relation(fields: [job_id], references: [id], onUpdate: NoAction, map: "fk_candidate_imports_job")
+  users          users?                          @relation(fields: [imported_by], references: [id], onUpdate: NoAction, map: "fk_candidate_imports_user")
+
+  @@index([imported_by], map: "fk_candidate_imports_user")
+  @@index([application_id], map: "idx_candidate_imports_application_id")
+  @@index([candidate_id], map: "idx_candidate_imports_candidate_id")
+  @@index([created_at], map: "idx_candidate_imports_created_at")
+  @@index([job_id], map: "idx_candidate_imports_job_id")
+  @@index([source], map: "idx_candidate_imports_source")
+  @@index([import_status], map: "idx_candidate_imports_status")
+}
+
+model candidate_leads {
+  id                       BigInt                 @id @default(autoincrement()) @db.UnsignedBigInt
+  source                   candidate_leads_source
+  source_url               String?                @db.VarChar(1000)
+  raw_text                 String                 @db.LongText
+  detected_name            String?                @db.VarChar(150)
+  detected_email           String?                @db.VarChar(255)
+  detected_phone           String?                @db.VarChar(30)
+  detected_position        String?                @db.VarChar(150)
+  skills                   Json?
+  ai_confidence            Decimal?               @db.Decimal(5, 2)
+  ai_reason                String?                @db.Text
+  target_job_id            BigInt?                @db.UnsignedBigInt
+  status                   candidate_leads_status @default(new)
+  reviewed_by              BigInt?                @db.UnsignedBigInt
+  reviewed_at              DateTime?              @db.Timestamp(0)
+  converted_candidate_id   BigInt?                @db.UnsignedBigInt
+  converted_application_id BigInt?                @db.UnsignedBigInt
+  created_at               DateTime               @default(now()) @db.Timestamp(0)
+  updated_at               DateTime               @default(now()) @db.Timestamp(0)
+  applications             applications?          @relation(fields: [converted_application_id], references: [id], onUpdate: NoAction, map: "fk_candidate_leads_application")
+  candidates               candidates?            @relation(fields: [converted_candidate_id], references: [id], onUpdate: NoAction, map: "fk_candidate_leads_candidate")
+  jobs                     jobs?                  @relation(fields: [target_job_id], references: [id], onUpdate: NoAction, map: "fk_candidate_leads_job")
+  users                    users?                 @relation(fields: [reviewed_by], references: [id], onUpdate: NoAction, map: "fk_candidate_leads_reviewer")
+
+  @@index([converted_application_id], map: "fk_candidate_leads_application")
+  @@index([converted_candidate_id], map: "fk_candidate_leads_candidate")
+  @@index([target_job_id], map: "fk_candidate_leads_job")
+  @@index([reviewed_by], map: "fk_candidate_leads_reviewer")
+}
+
+model google_accounts {
+  id            BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  user_id       BigInt    @unique(map: "user_id") @db.UnsignedBigInt
+  google_email  String    @db.VarChar(255)
+  access_token  String?   @db.Text
+  refresh_token String    @db.Text
+  token_expiry  DateTime? @db.DateTime(0)
+  scope         String?   @db.Text
+  created_at    DateTime  @default(now()) @db.Timestamp(0)
+  updated_at    DateTime  @default(now()) @updatedAt @db.Timestamp(0)
+  users         users     @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_google_accounts_user")
+
+  @@index([google_email], map: "idx_google_accounts_email")
+}
+
+model interviews {
+  id                 BigInt            @id @default(autoincrement()) @db.UnsignedBigInt
+  application_id     BigInt            @db.UnsignedBigInt
+  scheduled_by       BigInt            @db.UnsignedBigInt
+  title              String            @db.VarChar(255)
+  description        String?           @db.Text
+  start_at           DateTime          @db.DateTime(0)
+  end_at             DateTime          @db.DateTime(0)
+  timezone           String            @default("Asia/Bangkok") @db.VarChar(100)
+  status             interviews_status @default(scheduled)
+  candidate_email    String            @db.VarChar(255)
+  interviewer_emails Json
+  google_calendar_id String?           @db.VarChar(255)
+  google_event_id    String?           @unique @db.VarChar(255)
+  google_event_url   String?           @db.VarChar(1000)
+  meet_url           String?           @db.VarChar(1000)
+  created_at         DateTime          @default(now()) @db.Timestamp(0)
+  updated_at         DateTime          @default(now()) @updatedAt @db.Timestamp(0)
+  applications       applications      @relation(fields: [application_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_interviews_application")
+  users              users             @relation(fields: [scheduled_by], references: [id], onUpdate: NoAction, map: "fk_interviews_scheduled_by")
+
+  @@index([application_id])
+  @@index([scheduled_by])
+  @@index([start_at])
+  @@index([status])
+}
+
+enum interviews_status {
+  scheduled
+  completed
+  cancelled
+  rescheduled
+}
+
+enum candidate_skills_proficiency {
+  beginner
+  intermediate
+  advanced
+  expert
+}
+
+enum users_role {
+  admin
+  hr
+  interviewer
+}
+
+enum pipeline_stages_stage_type {
+  active
+  hired
+  rejected
+}
+
+enum jobs_employment_type {
+  full_time
+  part_time
+  contract
+  internship
+}
+
+enum resumes_parse_status {
+  pending
+  processing
+  completed
+  failed
+}
+
+enum candidates_source {
+  manual
+  website
+  email
+  linkedin
+  facebook
+  referral
+}
+
+enum applications_status {
+  active
+  hired
+  rejected
+  withdrawn
+}
+
+enum jobs_status {
+  draft
+  open
+  closed
+}
+
+enum candidate_imports_source {
+  linkedin
+  facebook
+  manual
+}
+
+enum candidate_imports_import_status {
+  pending
+  completed
+  failed
+  duplicate
+}
+
+enum candidate_leads_source {
+  facebook
+  linkedin
+  manual
+}
+
+enum candidate_leads_status {
+  new
+  reviewing
+  approved
+  rejected
+  converted
+  duplicate
+}

@@ -1,0 +1,57 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", "Inter Fallback", ui-sans-serif, system-ui, sans-serif;
+
+  /* Brand palette */
+  --color-canvas: #F7F8FA;
+  --color-primary: #1F4A3A;
+  --color-primary-light: #2C6650;
+  --color-primary-dark: #163529;
+  --color-accent: #E2793D;
+  --color-accent-light: #EE9761;
+  --color-ink: #20261F;
+  --color-surface-muted: #EFE6D3;
+
+  /* Status colors */
+  --color-success: #1F4A3A;
+  --color-warning: #B7791F;
+  --color-danger: #B3311E;
+  --color-info: #2563A8;
+
+  --radius-md: 0.55rem;
+  --radius-lg: 0.85rem;
+  --radius-xl: 1.1rem;
+}
+
+@layer base {
+  * {
+    border-color: rgba(32, 38, 31, 0.08);
+  }
+  html {
+    -webkit-font-smoothing: antialiased;
+  }
+  body {
+    background-color: var(--color-canvas);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+  }
+  ::selection {
+    background-color: var(--color-accent);
+    color: white;
+  }
+}
+
+@layer utilities {
+  .card-shadow {
+    box-shadow: 0 1px 2px rgba(32, 38, 31, 0.04), 0 4px 14px rgba(32, 38, 31, 0.05);
+  }
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background-color: rgba(32, 38, 31, 0.18);
+    border-radius: 999px;
+  }
+}
