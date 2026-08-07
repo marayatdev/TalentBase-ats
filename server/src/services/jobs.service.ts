@@ -65,22 +65,22 @@ export class JobService {
 
       OR: search
         ? [
-          {
-            title: {
-              contains: search,
+            {
+              title: {
+                contains: search,
+              },
             },
-          },
-          {
-            description: {
-              contains: search,
+            {
+              description: {
+                contains: search,
+              },
             },
-          },
-          {
-            requirements: {
-              contains: search,
+            {
+              requirements: {
+                contains: search,
+              },
             },
-          },
-        ]
+          ]
         : undefined,
     };
 

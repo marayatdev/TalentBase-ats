@@ -17,7 +17,7 @@ export class AuthController {
       { id: user.id.toString(), role: user.role },
       this.jwtSecret,
       {
-        expiresIn: "7d",
+        expiresIn: "15m",
       },
     );
   };
@@ -77,7 +77,7 @@ export class AuthController {
         httpOnly: true,
         secure: false,
         sameSite: "strict",
-        maxAge: 7 * 24 * 60 * 60 * 1000,
+        maxAge: 15 * 60 * 1000,
       });
 
       res.cookie("refreshToken", refreshToken, {
