@@ -148,61 +148,61 @@ export class CandidateImportController {
   }
 
   async analyzePost(
-  req: Request,
-  res: Response,
-  next: NextFunction,
-): Promise<void> {
-  try {
-    const candidatePostAnalyzerService =
-      new CandidatePostAnalyzerService();
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
+    try {
+      const candidatePostAnalyzerService =
+        new CandidatePostAnalyzerService();
 
-    const jobId =
-      req.body.job_id === undefined ||
-      req.body.job_id === null
-        ? ""
-        : String(req.body.job_id).trim();
+      const jobId =
+        req.body.job_id === undefined ||
+          req.body.job_id === null
+          ? ""
+          : String(req.body.job_id).trim();
 
-    const result =
-      await candidatePostAnalyzerService.analyze({
-        raw_text:
-          String(
-            req.body.raw_text ?? "",
-          ),
+      const result =
+        await candidatePostAnalyzerService.analyze({
+          raw_text:
+            String(
+              req.body.raw_text ?? "",
+            ),
 
-        source:
-          req.body.source ??
-          "facebook",
+          source:
+            req.body.source ??
+            "facebook",
 
-        source_url:
-          typeof req.body.source_url ===
-          "string"
-            ? req.body.source_url
-            : undefined,
+          source_url:
+            typeof req.body.source_url ===
+              "string"
+              ? req.body.source_url
+              : undefined,
 
-        job_id:
-          jobId,
+          job_id:
+            jobId,
 
-        /*
-         * เก็บไว้รองรับ client รุ่นเก่า
-         * แต่ Service ใหม่จะใช้ Job จาก job_id เป็นหลัก
-         */
-        target_position:
-          typeof req.body.target_position ===
-          "string"
-            ? req.body.target_position
-            : undefined,
-      });
+          /*
+           * เก็บไว้รองรับ client รุ่นเก่า
+           * แต่ Service ใหม่จะใช้ Job จาก job_id เป็นหลัก
+           */
+          target_position:
+            typeof req.body.target_position ===
+              "string"
+              ? req.body.target_position
+              : undefined,
+        });
 
-    ResponseFormatter.success(
-      res,
-      result,
-      "วิเคราะห์โพสต์ด้วย AI สำเร็จ",
-      200,
-    );
-  } catch (error) {
-    next(error);
+      ResponseFormatter.success(
+        res,
+        result,
+        "วิเคราะห์โพสต์ด้วย AI สำเร็จ",
+        200,
+      );
+    } catch (error) {
+      next(error);
+    }
   }
-}
 
   private parseId(value: unknown, fieldName: string): bigint {
     const stringValue = String(value ?? "");
