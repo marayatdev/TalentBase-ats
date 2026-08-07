@@ -3,7 +3,6 @@ import {
   candidate_leads_source,
   candidate_leads_status,
 } from "@/generated/prisma/client";
-import { CandidateLeadService } from "@/services/candidate-leads.service";
 import { AppError } from "@/utils/app-error";
 import { ResponseFormatter } from "@/utils/response";
 
@@ -43,13 +42,13 @@ export class CandidateLeadController {
 
         skills: Array.isArray(req.body.skills)
           ? req.body.skills.filter(
-              (value: unknown): value is string => typeof value === "string",
-            )
+            (value: unknown): value is string => typeof value === "string",
+          )
           : [],
 
         ai_confidence:
           req.body.ai_confidence === undefined ||
-          req.body.ai_confidence === null
+            req.body.ai_confidence === null
             ? null
             : Number(req.body.ai_confidence),
 
@@ -218,9 +217,9 @@ export class CandidateLeadController {
           req.body.total_experience_years === undefined
             ? undefined
             : this.parseNonNegativeNumber(
-                req.body.total_experience_years,
-                "total_experience_years",
-              ),
+              req.body.total_experience_years,
+              "total_experience_years",
+            ),
 
         job_id:
           req.body.job_id === undefined
