@@ -8,6 +8,10 @@ import type {
     ExtensionJob,
 } from "../types/job";
 
+import type {
+    PostAgeFilter,
+} from "../types/facebook-post";
+
 interface ExtensionResponse<T> {
     success: boolean;
     data?: T;
@@ -67,6 +71,11 @@ export default function Popup() {
         setIsGeneratingQueries,
     ] = useState(false);
 
+    const [
+        postAgeFilter,
+        setPostAgeFilter,
+    ] = useState<PostAgeFilter>("any");
+
     async function loadPopupData(): Promise<void> {
         setIsLoading(true);
         setErrorMessage("");
@@ -75,6 +84,7 @@ export default function Popup() {
             const [
                 jobsResponse,
                 selectedJobResponse,
+                postFilterStorage,
             ] = await Promise.all([
                 chrome.runtime.sendMessage({
                     type: "GET_OPEN_JOBS",
@@ -87,6 +97,10 @@ export default function Popup() {
                 }) as Promise<
                     ExtensionResponse<ExtensionJob | null>
                 >,
+
+                chrome.storage.local.get(
+                    "postMaxAgeDays",
+                ),
             ]);
 
             if (
@@ -126,6 +140,35 @@ export default function Popup() {
                 }
             } else {
                 setSelectedJobId("");
+            }
+
+            const storedDays =
+                postFilterStorage.postMaxAgeDays;
+
+            if (
+                storedDays === null ||
+                storedDays === undefined
+            ) {
+                setPostAgeFilter("any");
+            } else {
+                const normalized =
+                    String(storedDays);
+
+                if (
+                    [
+                        "1",
+                        "3",
+                        "7",
+                        "14",
+                        "30",
+                    ].includes(normalized)
+                ) {
+                    setPostAgeFilter(
+                        normalized as PostAgeFilter,
+                    );
+                } else {
+                    setPostAgeFilter("any");
+                }
             }
         } catch (error) {
             setErrorMessage(
@@ -205,7 +248,7 @@ export default function Popup() {
                 }
             }
 
-            window.close();
+            setSearchQueries([]);
         } catch (error) {
             setErrorMessage(
                 error instanceof Error
@@ -239,6 +282,7 @@ export default function Popup() {
             }
 
             setSelectedJobId("");
+            setSearchQueries([]);
 
             const tabs =
                 await chrome.tabs.query({
@@ -279,6 +323,63 @@ export default function Popup() {
             );
         } finally {
             setIsSaving(false);
+        }
+    }
+
+    async function handlePostAgeChange(
+        value: PostAgeFilter,
+    ): Promise<void> {
+        setPostAgeFilter(value);
+        setErrorMessage("");
+
+        const maxAgeDays =
+            value === "any"
+                ? null
+                : Number(value);
+
+        try {
+            await chrome.storage.local.set({
+                postMaxAgeDays:
+                    maxAgeDays,
+            });
+
+            const tabs =
+                await chrome.tabs.query({
+                    url: [
+                        "*://*.facebook.com/*",
+                    ],
+                });
+
+            for (const tab of tabs) {
+                if (!tab.id) {
+                    continue;
+                }
+
+                try {
+                    await chrome.tabs.sendMessage(
+                        tab.id,
+                        {
+                            type:
+                                "POST_AGE_FILTER_CHANGED",
+
+                            payload: {
+                                maxAgeDays,
+                            },
+                        },
+                    );
+                } catch {
+                    /*
+                     * Content script อาจยังไม่ถูก inject
+                     * การบันทึกใน storage ยังสำเร็จอยู่
+                     */
+                }
+            }
+        } catch (error) {
+            setErrorMessage(
+                error instanceof Error
+                    ? error.message
+                    : "Could not save post age filter",
+            );
         }
     }
 
@@ -420,6 +521,9 @@ export default function Popup() {
                             setSelectedJobId(
                                 event.target.value,
                             );
+
+                            setSearchQueries([]);
+                            setErrorMessage("");
                         }}
                         disabled={
                             isSaving ||
@@ -451,6 +555,81 @@ export default function Popup() {
                         ))}
                     </select>
                 )}
+            </section>
+
+            <section
+                style={{
+                    marginTop: 14,
+                }}
+            >
+                <label
+                    htmlFor="post-age-filter"
+                    style={{
+                        display: "block",
+                        marginBottom: 6,
+                        fontSize: 12,
+                        fontWeight: 600,
+                    }}
+                >
+                    Post age
+                </label>
+
+                <select
+                    id="post-age-filter"
+                    value={postAgeFilter}
+                    onChange={(event) => {
+                        void handlePostAgeChange(
+                            event.target.value as PostAgeFilter,
+                        );
+                    }}
+                    style={{
+                        width: "100%",
+                        minHeight: 40,
+                        borderRadius: 8,
+                        border:
+                            "1px solid rgba(32,38,31,0.15)",
+                        padding: "0 10px",
+                        background: "white",
+                        color: "#20261F",
+                    }}
+                >
+                    <option value="any">
+                        Any time
+                    </option>
+
+                    <option value="1">
+                        Last 1 day
+                    </option>
+
+                    <option value="3">
+                        Last 3 days
+                    </option>
+
+                    <option value="7">
+                        Last 7 days
+                    </option>
+
+                    <option value="14">
+                        Last 14 days
+                    </option>
+
+                    <option value="30">
+                        Last 30 days
+                    </option>
+                </select>
+
+                <p
+                    style={{
+                        marginTop: 6,
+                        marginBottom: 0,
+                        fontSize: 11,
+                        lineHeight: 1.4,
+                        opacity: 0.55,
+                    }}
+                >
+                    Only posts within this age range
+                    will be sent for AI analysis.
+                </p>
             </section>
 
             {!isLoading &&
@@ -617,21 +796,6 @@ export default function Popup() {
                 </section>
             )}
 
-            {errorMessage && (
-                <div
-                    style={{
-                        marginTop: 12,
-                        borderRadius: 8,
-                        padding: 10,
-                        fontSize: 12,
-                        color: "#9F1D1D",
-                        background: "#FDECEC",
-                    }}
-                >
-                    {errorMessage}
-                </div>
-            )}
-
             {searchQueries.length > 0 && (
                 <section
                     style={{
@@ -656,7 +820,10 @@ export default function Popup() {
                         }}
                     >
                         {searchQueries.map(
-                            (query, index) => (
+                            (
+                                query,
+                                index,
+                            ) => (
                                 <button
                                     key={`${query}-${index}`}
                                     type="button"
@@ -685,6 +852,21 @@ export default function Popup() {
                         )}
                     </div>
                 </section>
+            )}
+
+            {errorMessage && (
+                <div
+                    style={{
+                        marginTop: 12,
+                        borderRadius: 8,
+                        padding: 10,
+                        fontSize: 12,
+                        color: "#9F1D1D",
+                        background: "#FDECEC",
+                    }}
+                >
+                    {errorMessage}
+                </div>
             )}
 
             <div

@@ -13,25 +13,59 @@ import type {
   FacebookPost,
   FacebookPostMatch,
 } from "../../types/facebook-post";
-import type { ExtensionJob } from "../../types/job";
+
+import type {
+  ExtensionJob,
+} from "../../types/job";
 
 console.log(
   "[HR ATS Extension] Facebook content script loaded",
 );
 
-const ARTICLE_SELECTOR = '[role="article"]';
-const SCAN_DELAY_MS = 700;
+const ARTICLE_SELECTOR =
+  '[role="article"]';
 
-const MAX_AI_ANALYSIS_PER_SCAN = 1;
-const MIN_LOCAL_SCORE_FOR_AI = -100;
-const MIN_AI_CONFIDENCE = 70;
+const SCAN_DELAY_MS =
+  700;
 
-let selectedJob: ExtensionJob | null = null;
-let scanTimer: number | undefined;
-let lastSignature = "";
+const MAX_AI_ANALYSIS_PER_SCAN =
+  1;
+
+const MIN_LOCAL_SCORE_FOR_AI =
+  -100;
+
+const MIN_AI_CONFIDENCE =
+  70;
+
+/*
+ * null = Any time
+ *
+ * 1  = Last 1 day
+ * 3  = Last 3 days
+ * 7  = Last 7 days
+ * 14 = Last 14 days
+ * 30 = Last 30 days
+ */
+let postMaxAgeDays:
+  | number
+  | null = null;
+
+let selectedJob:
+  | ExtensionJob
+  | null = null;
+
+let scanTimer:
+  | number
+  | undefined;
+
+let lastSignature =
+  "";
 
 const articleByPostId =
-  new Map<string, HTMLElement>();
+  new Map<
+    string,
+    HTMLElement
+  >();
 
 /*
  * ป้องกันการส่งโพสต์เดิมไปวิเคราะห์ซ้ำ
@@ -43,10 +77,13 @@ const analyzedPostIds =
   new Set<string>();
 
 /*
- * เก็บผล AI เอาไว้ใช้ตอน Facebook rerender DOM
+ * เก็บผล AI ไว้สำหรับกรณี Facebook rerender DOM
  */
 const analysisCache =
-  new Map<string, CandidatePostAnalysis>();
+  new Map<
+    string,
+    CandidatePostAnalysis
+  >();
 
 interface AnalyzePostMessageResponse {
   success: boolean;
@@ -55,12 +92,30 @@ interface AnalyzePostMessageResponse {
 }
 
 interface SelectedJobChangedMessage {
-  type: "SELECTED_JOB_CHANGED";
+  type:
+  "SELECTED_JOB_CHANGED";
 
   payload?: {
-    job?: ExtensionJob | null;
+    job?:
+    | ExtensionJob
+    | null;
   };
 }
+
+interface PostAgeFilterChangedMessage {
+  type:
+  "POST_AGE_FILTER_CHANGED";
+
+  payload?: {
+    maxAgeDays?:
+    | number
+    | null;
+  };
+}
+
+type ContentMessage =
+  | SelectedJobChangedMessage
+  | PostAgeFilterChangedMessage;
 
 function findArticles(): HTMLElement[] {
   return Array.from(
@@ -76,7 +131,12 @@ function createPostsSignature(
   return posts
     .map(
       (post) =>
-        `${post.id}:${post.score}:${post.isMatched}`,
+        [
+          post.id,
+          post.score,
+          post.isMatched,
+          post.createdAtDate ?? "unknown-date",
+        ].join(":"),
     )
     .join("|");
 }
@@ -88,7 +148,7 @@ function isAcceptedAnalysis(
     analysis.is_job_seeker &&
     analysis.matches_target_position &&
     analysis.confidence >=
-      MIN_AI_CONFIDENCE
+    MIN_AI_CONFIDENCE
   );
 }
 
@@ -100,18 +160,46 @@ function printPosts(
   );
 
   console.table(
-    posts.map((post, index) => ({
-      post: index + 1,
-      author: post.author ?? "-",
-      createdAt: post.createdAt ?? "-",
-      localScore: post.score,
-      localMatched: post.isMatched,
-      keywords:
-        post.matchedKeywords.join(", "),
-      hasUrl: Boolean(post.url),
-      preview:
-        post.text.slice(0, 100),
-    })),
+    posts.map(
+      (
+        post,
+        index,
+      ) => ({
+        post:
+          index + 1,
+
+        author:
+          post.author ?? "-",
+
+        createdAt:
+          post.createdAt ?? "-",
+
+        createdAtDate:
+          post.createdAtDate ?? "-",
+
+        localScore:
+          post.score,
+
+        localMatched:
+          post.isMatched,
+
+        keywords:
+          post.matchedKeywords.join(
+            ", ",
+          ),
+
+        hasUrl:
+          Boolean(
+            post.url,
+          ),
+
+        preview:
+          post.text.slice(
+            0,
+            100,
+          ),
+      }),
+    ),
   );
 }
 
@@ -120,11 +208,14 @@ function printAIAnalysis(
   analysis: CandidatePostAnalysis,
 ): void {
   const passed =
-    isAcceptedAnalysis(analysis);
+    isAcceptedAnalysis(
+      analysis,
+    );
 
   console.groupCollapsed(
-    `[HR ATS Extension] AI analysis · ${
-      passed ? "MATCH" : "NOT MATCH"
+    `[HR ATS Extension] AI analysis · ${passed
+      ? "MATCH"
+      : "NOT MATCH"
     } · ${analysis.confidence}%`,
   );
 
@@ -136,6 +227,16 @@ function printAIAnalysis(
   console.log(
     "Post URL:",
     post.url,
+  );
+
+  console.log(
+    "Created at:",
+    post.createdAt,
+  );
+
+  console.log(
+    "Created at date:",
+    post.createdAtDate,
   );
 
   console.log(
@@ -151,9 +252,18 @@ function printAIAnalysis(
   console.log(
     "Selected job:",
     {
-      id: selectedJob?.id,
-      title: selectedJob?.title,
+      id:
+        selectedJob?.id,
+
+      title:
+        selectedJob?.title,
     },
+  );
+
+  console.log(
+    "Post max age days:",
+    postMaxAgeDays ??
+    "Any time",
   );
 
   console.log(
@@ -258,21 +368,134 @@ function clearAnalysisState(): void {
   analyzedPostIds.clear();
   analysisCache.clear();
 
-  lastSignature = "";
+  lastSignature =
+    "";
 }
 
-async function loadSelectedJob(): Promise<void> {
-  const stored =
-    await chrome.storage.local.get(
-      "selectedJob",
+function normalizePostMaxAgeDays(
+  value: unknown,
+): number | null {
+  if (
+    value === null ||
+    value === undefined ||
+    value === ""
+  ) {
+    return null;
+  }
+
+  const parsed =
+    Number(value);
+
+  if (
+    !Number.isFinite(
+      parsed,
+    ) ||
+    parsed <= 0
+  ) {
+    return null;
+  }
+
+  const allowedDays =
+    new Set([
+      1,
+      3,
+      7,
+      14,
+      30,
+    ]);
+
+  return allowedDays.has(
+    parsed,
+  )
+    ? parsed
+    : null;
+}
+
+function isPostWithinAge(
+  post: FacebookPost,
+): boolean {
+  /*
+   * Any time
+   */
+  if (
+    postMaxAgeDays ===
+    null
+  ) {
+    return true;
+  }
+
+  /*
+   * ถ้า HR เลือก filter เวลา
+   * แต่ parser อ่านวันที่โพสต์ไม่ได้
+   * จะไม่ส่งโพสต์นี้เข้า AI
+   *
+   * เพื่อป้องกันโพสต์เก่าที่ไม่ทราบเวลา
+   * หลุดเข้ามาในผลลัพธ์
+   */
+  if (
+    !post.createdAtDate
+  ) {
+    return false;
+  }
+
+  const createdAt =
+    new Date(
+      post.createdAtDate,
     );
+
+  if (
+    Number.isNaN(
+      createdAt.getTime(),
+    )
+  ) {
+    return false;
+  }
+
+  const ageMilliseconds =
+    Date.now() -
+    createdAt.getTime();
+
+  /*
+   * ป้องกันเวลาที่ parse แล้วเป็นอนาคต
+   */
+  if (
+    ageMilliseconds <
+    0
+  ) {
+    return false;
+  }
+
+  const maximumAgeMilliseconds =
+    postMaxAgeDays *
+    24 *
+    60 *
+    60 *
+    1000;
+
+  return (
+    ageMilliseconds <=
+    maximumAgeMilliseconds
+  );
+}
+
+async function loadSettings(): Promise<void> {
+  const stored =
+    await chrome.storage.local.get([
+      "selectedJob",
+      "postMaxAgeDays",
+    ]);
 
   selectedJob =
     (
       stored.selectedJob as
-        | ExtensionJob
-        | undefined
+      | ExtensionJob
+      | undefined
     ) ?? null;
+
+  postMaxAgeDays =
+    normalizePostMaxAgeDays(
+      stored.postMaxAgeDays,
+    );
 
   if (selectedJob) {
     console.log(
@@ -285,12 +508,106 @@ async function loadSelectedJob(): Promise<void> {
           selectedJob.title,
       },
     );
+  } else {
+    console.warn(
+      "[HR ATS Extension] No job selected. Open the extension popup and select a job.",
+    );
+  }
 
+  console.log(
+    "[HR ATS Extension] Post age filter loaded",
+    {
+      maxAgeDays:
+        postMaxAgeDays,
+
+      label:
+        postMaxAgeDays ===
+          null
+          ? "Any time"
+          : `Last ${postMaxAgeDays} day(s)`,
+    },
+  );
+}
+
+function isExtensionContextAvailable(): boolean {
+  try {
+    return Boolean(
+      chrome.runtime?.id,
+    );
+  } catch {
+    return false;
+  }
+}
+
+function showExtensionReloadNotice(): void {
+  const noticeId =
+    "hr-ats-extension-reload-notice";
+
+  if (
+    document.getElementById(
+      noticeId,
+    )
+  ) {
     return;
   }
 
-  console.warn(
-    "[HR ATS Extension] No job selected. Open the extension popup and select a job.",
+  const notice =
+    document.createElement(
+      "div",
+    );
+
+  notice.id =
+    noticeId;
+
+  notice.textContent =
+    "HR ATS Extension was updated. Refresh this Facebook page to continue.";
+
+  Object.assign(
+    notice.style,
+    {
+      position:
+        "fixed",
+
+      right:
+        "20px",
+
+      bottom:
+        "20px",
+
+      zIndex:
+        "2147483647",
+
+      maxWidth:
+        "360px",
+
+      padding:
+        "12px 16px",
+
+      borderRadius:
+        "10px",
+
+      background:
+        "#1F4A3A",
+
+      color:
+        "#FFFFFF",
+
+      fontSize:
+        "13px",
+
+      fontFamily:
+        "Arial, sans-serif",
+
+      lineHeight:
+        "1.5",
+
+      boxShadow:
+        "0 10px 30px rgba(0,0,0,0.18)",
+    },
+  );
+
+  document.body.appendChild(
+    notice,
   );
 }
 
@@ -306,6 +623,14 @@ async function analyzePostWithAI(
   }
 
   if (
+    !isPostWithinAge(
+      post,
+    )
+  ) {
+    return;
+  }
+
+  if (
     analyzedPostIds.has(
       post.id,
     ) ||
@@ -316,13 +641,25 @@ async function analyzePostWithAI(
     return;
   }
 
+  if (
+    !isExtensionContextAvailable()
+  ) {
+    console.warn(
+      "[HR ATS Extension] Extension context was invalidated. Refresh the Facebook page.",
+    );
+
+    showExtensionReloadNotice();
+
+    return;
+  }
+
   analyzingPostIds.add(
     post.id,
   );
 
   /*
-   * เก็บ snapshot ป้องกัน Job เปลี่ยน
-   * ระหว่างที่กำลังรอ AI ตอบกลับ
+   * เก็บ Job snapshot ไว้
+   * ป้องกัน Job เปลี่ยนระหว่างรอ AI
    */
   const jobSnapshot =
     selectedJob;
@@ -349,6 +686,9 @@ async function analyzePostWithAI(
 
             createdAt:
               post.createdAt,
+
+            createdAtDate:
+              post.createdAtDate,
           } satisfies FacebookPost,
 
           job: {
@@ -369,13 +709,16 @@ async function analyzePostWithAI(
 
             employment_type:
               jobSnapshot.employment_type,
+
+            status:
+              jobSnapshot.status,
           },
         },
       })) as AnalyzePostMessageResponse;
 
     /*
-     * หากผู้ใช้เปลี่ยน Job ระหว่างรอ AI
-     * ไม่ควรเอาผลเก่ามาแสดง
+     * ถ้าผู้ใช้เปลี่ยน Job ระหว่างรอ AI
+     * ไม่ใช้ผลของ Job เก่า
      */
     if (
       selectedJob?.id !==
@@ -395,13 +738,42 @@ async function analyzePostWithAI(
       return;
     }
 
+    /*
+     * ถ้าผู้ใช้เปลี่ยน age filter
+     * ระหว่างรอ AI และโพสต์นี้ไม่ผ่าน filter ใหม่แล้ว
+     * ไม่แสดงผล
+     */
+    if (
+      !isPostWithinAge(
+        post,
+      )
+    ) {
+      console.warn(
+        "[HR ATS Extension] Ignoring stale AI result because post age filter changed",
+        {
+          postId:
+            post.id,
+
+          createdAt:
+            post.createdAt,
+
+          createdAtDate:
+            post.createdAtDate,
+
+          postMaxAgeDays,
+        },
+      );
+
+      return;
+    }
+
     if (
       !response?.success ||
       !response.data
     ) {
       throw new Error(
         response?.message ??
-          "AI post analysis failed",
+        "AI post analysis failed",
       );
     }
 
@@ -423,7 +795,7 @@ async function analyzePostWithAI(
     );
 
     /*
-     * แสดงหรือลบ UI ทันทีหลัง AI ตอบกลับ
+     * แสดงหรือลบ UI ทันทีหลัง AI ตอบ
      */
     updatePostUI(
       post,
@@ -455,13 +827,40 @@ async function analyzePostWithAI(
 
           jobTitle:
             jobSnapshot.title,
+
+          createdAt:
+            post.createdAt,
+
+          createdAtDate:
+            post.createdAtDate,
         },
       );
     }
   } catch (error) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : String(
+          error,
+        );
+
+    if (
+      message.includes(
+        "Extension context invalidated",
+      )
+    ) {
+      console.warn(
+        "[HR ATS Extension] Extension was reloaded. Refresh the Facebook page before scanning again.",
+      );
+
+      showExtensionReloadNotice();
+
+      return;
+    }
+
     /*
-     * ไม่เพิ่มลง analyzedPostIds
-     * เพื่อให้ลองใหม่ใน scan รอบถัดไปได้
+     * ไม่เพิ่ม analyzedPostIds
+     * เพื่อให้ scan รอบถัดไปลองใหม่ได้
      */
     console.error(
       "[HR ATS Extension] AI analysis failed",
@@ -490,39 +889,57 @@ function selectPostsForAI(
   }
 
   return posts
-    .filter((post) => {
-      if (
-        analyzedPostIds.has(
-          post.id,
-        ) ||
-        analyzingPostIds.has(
-          post.id,
-        )
-      ) {
-        return false;
-      }
+    .filter(
+      (
+        post,
+      ) => {
+        if (
+          analyzedPostIds.has(
+            post.id,
+          ) ||
+          analyzingPostIds.has(
+            post.id,
+          )
+        ) {
+          return false;
+        }
 
-      /*
-       * ต้องมี URL เพื่อบันทึกเป็น source_url
-       */
-      if (!post.url) {
-        return false;
-      }
+        /*
+         * ต้องมี URL เพื่อ save source_url
+         */
+        if (!post.url) {
+          return false;
+        }
 
-      /*
-       * ไม่ส่งโพสต์ที่คะแนน Local ต่ำเกินไป
-       */
-      if (
-        post.score <
-        MIN_LOCAL_SCORE_FOR_AI
-      ) {
-        return false;
-      }
+        /*
+         * กรองอายุโพสต์ก่อนส่ง AI
+         */
+        if (
+          !isPostWithinAge(
+            post,
+          )
+        ) {
+          return false;
+        }
 
-      return true;
-    })
+        /*
+         * Local filter threshold
+         */
+        if (
+          post.score <
+          MIN_LOCAL_SCORE_FOR_AI
+        ) {
+          return false;
+        }
+
+        return true;
+      },
+    )
     .sort(
-      (first, second) =>
+      (
+        first,
+        second,
+      ) =>
         second.score -
         first.score,
     )
@@ -535,7 +952,35 @@ function selectPostsForAI(
 function restoreCachedPostUI(
   posts: FacebookPostMatch[],
 ): void {
-  for (const post of posts) {
+  for (
+    const post
+    of posts
+  ) {
+    /*
+     * ถ้า post ไม่ผ่าน age filter ปัจจุบัน
+     * ต้องไม่ restore toolbar จาก cache
+     */
+    if (
+      !isPostWithinAge(
+        post,
+      )
+    ) {
+      const article =
+        articleByPostId.get(
+          post.id,
+        );
+
+      if (
+        article
+      ) {
+        removePostMatchUI(
+          article,
+        );
+      }
+
+      continue;
+    }
+
     const analysis =
       analysisCache.get(
         post.id,
@@ -545,10 +990,6 @@ function restoreCachedPostUI(
       continue;
     }
 
-    /*
-     * Facebook อาจสร้าง article DOM ใหม่ตอน scroll
-     * จึงต้อง render toolbar กลับมาอีกครั้งจาก cache
-     */
     updatePostUI(
       post,
       analysis,
@@ -574,28 +1015,68 @@ function scanFacebookPosts(): FacebookPostMatch[] {
     `[HR ATS Extension] Found ${articles.length} article elements`,
   );
 
+  let skippedByAge =
+    0;
+
+  let skippedUnknownDate =
+    0;
+
   const posts =
     articles
-      .map((article) => {
-        const parsedPost =
-          parsePost(
+      .map(
+        (
+          article,
+        ) => {
+          const parsedPost =
+            parsePost(
+              article,
+            );
+
+          if (
+            !parsedPost
+          ) {
+            return null;
+          }
+
+          /*
+           * เก็บ map ก่อน filter
+           * เพื่อให้ลบ UI เดิมได้แม้ post ถูก filter ออก
+           */
+          articleByPostId.set(
+            parsedPost.id,
             article,
           );
 
-        if (!parsedPost) {
-          return null;
-        }
+          if (
+            !isPostWithinAge(
+              parsedPost,
+            )
+          ) {
+            if (
+              postMaxAgeDays !==
+              null &&
+              !parsedPost.createdAtDate
+            ) {
+              skippedUnknownDate +=
+                1;
+            } else {
+              skippedByAge +=
+                1;
+            }
 
-        articleByPostId.set(
-          parsedPost.id,
-          article,
-        );
+            removePostMatchUI(
+              article,
+            );
 
-        return filterFacebookPost(
-          parsedPost,
-          defaultFilterConfig,
-        );
-      })
+            return null;
+          }
+
+          return filterFacebookPost(
+            parsedPost,
+            defaultFilterConfig,
+          );
+        },
+      )
       .filter(
         (
           post,
@@ -603,8 +1084,28 @@ function scanFacebookPosts(): FacebookPostMatch[] {
           post !== null,
       );
 
+  if (
+    postMaxAgeDays !==
+    null
+  ) {
+    console.log(
+      "[HR ATS Extension] Post age filter result",
+      {
+        maxAgeDays:
+          postMaxAgeDays,
+
+        accepted:
+          posts.length,
+
+        skippedByAge,
+
+        skippedUnknownDate,
+      },
+    );
+  }
+
   /*
-   * คืน toolbar จาก cache หาก Facebook rerender โพสต์
+   * Facebook อาจสร้าง DOM ใหม่ตอน scroll
    */
   restoreCachedPostUI(
     posts,
@@ -628,12 +1129,22 @@ function scanFacebookPosts(): FacebookPostMatch[] {
 
     const localMatches =
       posts.filter(
-        (post) =>
+        (
+          post,
+        ) =>
           post.isMatched,
       );
 
     console.log(
       `[HR ATS Extension] Local filter matched ${localMatches.length} posts for ${selectedJob.title}`,
+    );
+
+    console.log(
+      "[HR ATS Extension] Active post age filter",
+      postMaxAgeDays ===
+        null
+        ? "Any time"
+        : `Last ${postMaxAgeDays} day(s)`,
     );
   }
 
@@ -677,88 +1188,169 @@ function scheduleScan(): void {
     );
 }
 
+function handleSelectedJobChanged(
+  job:
+    | ExtensionJob
+    | null,
+): void {
+  selectedJob =
+    job;
+
+  /*
+   * Job เปลี่ยนแล้วผล AI เดิมใช้ไม่ได้
+   */
+  clearAnalysisState();
+  clearPostUI();
+
+  console.log(
+    "[HR ATS Extension] Selected job changed",
+    selectedJob,
+  );
+
+  if (
+    selectedJob
+  ) {
+    scheduleScan();
+  }
+}
+
+function handlePostAgeFilterChanged(
+  maxAgeDays:
+    | number
+    | null,
+): void {
+  postMaxAgeDays =
+    normalizePostMaxAgeDays(
+      maxAgeDays,
+    );
+
+  /*
+   * ต้องล้าง cache เพราะผลเดิมอาจเป็นโพสต์
+   * ที่ไม่ผ่าน filter ใหม่
+   */
+  clearAnalysisState();
+  clearPostUI();
+
+  console.log(
+    "[HR ATS Extension] Post age filter changed",
+    {
+      maxAgeDays:
+        postMaxAgeDays,
+
+      label:
+        postMaxAgeDays ===
+          null
+          ? "Any time"
+          : `Last ${postMaxAgeDays} day(s)`,
+    },
+  );
+
+  if (
+    selectedJob
+  ) {
+    scheduleScan();
+  }
+}
+
+/*
+ * รับ event จาก Popup โดยตรง
+ */
 chrome.runtime.onMessage.addListener(
   (
     message:
-      SelectedJobChangedMessage,
+      ContentMessage,
   ) => {
     if (
-      message.type !==
+      message.type ===
       "SELECTED_JOB_CHANGED"
     ) {
+      handleSelectedJobChanged(
+        message.payload?.job ??
+        null,
+      );
+
       return false;
     }
 
-    selectedJob =
-      message.payload?.job ??
-      null;
+    if (
+      message.type ===
+      "POST_AGE_FILTER_CHANGED"
+    ) {
+      handlePostAgeFilterChanged(
+        message.payload
+          ?.maxAgeDays ??
+        null,
+      );
 
-    /*
-     * Job เปลี่ยนแล้ว ต้องล้าง cache
-     * เพราะโพสต์เดิมต้องวิเคราะห์ใหม่
-     * ด้วย criteria ของ Job ใหม่
-     */
-    clearAnalysisState();
-    clearPostUI();
-
-    console.log(
-      "[HR ATS Extension] Selected job changed",
-      selectedJob,
-    );
-
-    if (selectedJob) {
-      scheduleScan();
+      return false;
     }
 
     return false;
   },
 );
 
+/*
+ * รับ storage change เป็น fallback
+ *
+ * ทำให้แม้ Popup ส่ง message ไม่ถึง
+ * content script ก็ยังเห็นค่าที่เปลี่ยน
+ */
 chrome.storage.onChanged.addListener(
   (
     changes,
     areaName,
   ) => {
     if (
-      areaName !== "local" ||
-      !changes.selectedJob
+      areaName !==
+      "local"
     ) {
       return;
     }
 
-    selectedJob =
-      (
-        changes.selectedJob
-          .newValue as
+    if (
+      changes.selectedJob
+    ) {
+      const newJob =
+        (
+          changes.selectedJob
+            .newValue as
           | ExtensionJob
           | undefined
-      ) ?? null;
+        ) ?? null;
 
-    clearAnalysisState();
-    clearPostUI();
+      handleSelectedJobChanged(
+        newJob,
+      );
+    }
 
-    console.log(
-      "[HR ATS Extension] Selected job changed from storage",
-      selectedJob,
-    );
-
-    if (selectedJob) {
-      scheduleScan();
+    if (
+      changes.postMaxAgeDays
+    ) {
+      handlePostAgeFilterChanged(
+        normalizePostMaxAgeDays(
+          changes.postMaxAgeDays
+            .newValue,
+        ),
+      );
     }
   },
 );
 
 async function startScanner(): Promise<void> {
-  await loadSelectedJob();
+  await loadSettings();
 
-  if (selectedJob) {
+  if (
+    selectedJob
+  ) {
     scanFacebookPosts();
   }
 
   const observer =
     new MutationObserver(
       () => {
-        if (selectedJob) {
+        if (
+          selectedJob
+        ) {
           scheduleScan();
         }
       },
@@ -767,13 +1359,23 @@ async function startScanner(): Promise<void> {
   observer.observe(
     document.body,
     {
-      childList: true,
-      subtree: true,
+      childList:
+        true,
+
+      subtree:
+        true,
     },
   );
 
   console.log(
     "[HR ATS Extension] Facebook observer started",
+    {
+      selectedJobId:
+        selectedJob?.id ??
+        null,
+
+      postMaxAgeDays,
+    },
   );
 }
 
@@ -787,7 +1389,8 @@ if (
       void startScanner();
     },
     {
-      once: true,
+      once:
+        true,
     },
   );
 } else {
