@@ -25,7 +25,6 @@ router.delete("/:id", jobController.delete.bind(jobController));
 
 router.post(
     "/:jobId/search-queries",
-    authMiddleware,
     candidateSearchQueryController.generate.bind(
         candidateSearchQueryController,
     ),

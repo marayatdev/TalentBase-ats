@@ -57,6 +57,16 @@ export default function Popup() {
         void loadPopupData();
     }, []);
 
+    const [
+        searchQueries,
+        setSearchQueries,
+    ] = useState<string[]>([]);
+
+    const [
+        isGeneratingQueries,
+        setIsGeneratingQueries,
+    ] = useState(false);
+
     async function loadPopupData(): Promise<void> {
         setIsLoading(true);
         setErrorMessage("");
@@ -270,6 +280,74 @@ export default function Popup() {
         } finally {
             setIsSaving(false);
         }
+    }
+
+    async function generateSearchQueries(): Promise<void> {
+        if (!selectedJob) {
+            setErrorMessage(
+                "Please select a job first",
+            );
+
+            return;
+        }
+
+        setIsGeneratingQueries(
+            true,
+        );
+
+        setErrorMessage("");
+
+        try {
+            const response =
+                (await chrome.runtime.sendMessage({
+                    type:
+                        "GENERATE_SEARCH_QUERIES",
+
+                    payload: {
+                        jobId:
+                            selectedJob.id,
+                    },
+                })) as ExtensionResponse<{
+                    job_id: string;
+                    job_title: string;
+                    queries: string[];
+                }>;
+
+            if (
+                !response.success ||
+                !response.data
+            ) {
+                throw new Error(
+                    response.message ??
+                    "Could not generate search queries",
+                );
+            }
+
+            setSearchQueries(
+                response.data.queries,
+            );
+        } catch (error) {
+            setErrorMessage(
+                error instanceof Error
+                    ? error.message
+                    : "Could not generate search queries",
+            );
+        } finally {
+            setIsGeneratingQueries(
+                false,
+            );
+        }
+    }
+
+    async function openFacebookSearch(
+        query: string,
+    ): Promise<void> {
+        const url =
+            `https://www.facebook.com/search/posts/?q=${encodeURIComponent(query)}`;
+
+        await chrome.tabs.create({
+            url,
+        });
     }
 
     return (
@@ -502,6 +580,43 @@ export default function Popup() {
                 </section>
             )}
 
+            {selectedJob && (
+                <section
+                    style={{
+                        marginTop: 14,
+                    }}
+                >
+                    <button
+                        type="button"
+                        onClick={() => {
+                            void generateSearchQueries();
+                        }}
+                        disabled={
+                            isGeneratingQueries
+                        }
+                        style={{
+                            width: "100%",
+                            minHeight: 40,
+                            border: 0,
+                            borderRadius: 8,
+                            background:
+                                "#E2793D",
+                            color:
+                                "#FFFFFF",
+                            fontWeight: 600,
+                            cursor:
+                                isGeneratingQueries
+                                    ? "not-allowed"
+                                    : "pointer",
+                        }}
+                    >
+                        {isGeneratingQueries
+                            ? "Generating..."
+                            : "Generate Search Queries"}
+                    </button>
+                </section>
+            )}
+
             {errorMessage && (
                 <div
                     style={{
@@ -515,6 +630,61 @@ export default function Popup() {
                 >
                     {errorMessage}
                 </div>
+            )}
+
+            {searchQueries.length > 0 && (
+                <section
+                    style={{
+                        marginTop: 16,
+                    }}
+                >
+                    <p
+                        style={{
+                            margin: 0,
+                            marginBottom: 8,
+                            fontSize: 12,
+                            fontWeight: 700,
+                        }}
+                    >
+                        Suggested searches
+                    </p>
+
+                    <div
+                        style={{
+                            display: "grid",
+                            gap: 8,
+                        }}
+                    >
+                        {searchQueries.map(
+                            (query, index) => (
+                                <button
+                                    key={`${query}-${index}`}
+                                    type="button"
+                                    onClick={() => {
+                                        void openFacebookSearch(
+                                            query,
+                                        );
+                                    }}
+                                    style={{
+                                        width: "100%",
+                                        border:
+                                            "1px solid rgba(32,38,31,0.1)",
+                                        borderRadius: 8,
+                                        padding: "9px 10px",
+                                        background: "#FFFFFF",
+                                        color: "#20261F",
+                                        fontSize: 12,
+                                        textAlign: "left",
+                                        lineHeight: 1.45,
+                                        cursor: "pointer",
+                                    }}
+                                >
+                                    🔎 {query}
+                                </button>
+                            ),
+                        )}
+                    </div>
+                </section>
             )}
 
             <div

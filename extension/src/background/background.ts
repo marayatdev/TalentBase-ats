@@ -1,10 +1,6 @@
-import type {
-  ExtensionJob,
-} from "../types/job";
+import type { ExtensionJob } from "../types/job";
 
-import type {
-  ExtensionMessage,
-} from "../types/messages";
+import type { ExtensionMessage } from "../types/messages";
 
 import type {
   CandidatePostAnalysis,
@@ -15,8 +11,21 @@ import type {
   CreateCandidateLeadPayload,
 } from "../types/candidate-lead";
 
+/*
+ * =========================================================
+ * CONFIG
+ * =========================================================
+ */
+
 const ATS_API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL ??
   "http://localhost:8000/api";
+
+/*
+ * =========================================================
+ * API TYPES
+ * =========================================================
+ */
 
 interface ApiSuccess<T> {
   success: boolean;
@@ -31,6 +40,18 @@ interface ApiErrorResponse {
   message?: string;
 }
 
+interface ExtensionResponse<T> {
+  success: boolean;
+  data?: T;
+  message?: string;
+}
+
+/*
+ * =========================================================
+ * JOB TYPES
+ * =========================================================
+ */
+
 interface JobsResponse {
   jobs: Array<{
     id: string | number;
@@ -38,6 +59,7 @@ interface JobsResponse {
     title: string;
 
     description?: string | null;
+
     requirements?: string | null;
 
     minimum_experience_years?:
@@ -58,29 +80,37 @@ interface JobsResponse {
   }>;
 }
 
-interface ExtensionResponse<T> {
-  success: boolean;
-  data?: T;
-  message?: string;
+/*
+ * =========================================================
+ * SEARCH QUERY TYPES
+ * =========================================================
+ */
+
+interface SearchQueriesResult {
+  job_id: string;
+  job_title: string;
+  queries: string[];
 }
+
+/*
+ * =========================================================
+ * HELPERS
+ * =========================================================
+ */
 
 function normalizeJob(
   job: JobsResponse["jobs"][number],
 ): ExtensionJob {
   return {
-    id:
-      String(job.id),
+    id: String(job.id),
 
-    title:
-      job.title,
+    title: job.title,
 
     description:
-      job.description ??
-      null,
+      job.description ?? null,
 
     requirements:
-      job.requirements ??
-      null,
+      job.requirements ?? null,
 
     minimum_experience_years:
       Number(
@@ -114,7 +144,13 @@ async function parseErrorMessage(
 }
 
 /*
- * โหลด Job ที่เปิดรับสมัครอยู่
+ * =========================================================
+ * JOB API
+ * =========================================================
+ */
+
+/*
+ * โหลด Job ที่ status = open
  */
 async function getOpenJobs(): Promise<
   ExtensionJob[]
@@ -142,25 +178,25 @@ async function getOpenJobs(): Promise<
         `Could not load jobs (${response.status})`,
       );
 
-    throw new Error(
-      message,
-    );
+    throw new Error(message);
   }
 
   const body =
-    (await response.json()) as ApiSuccess<JobsResponse>;
+    (await response.json()) as
+    ApiSuccess<JobsResponse>;
 
   return (
-    body.data.jobs ??
+    body.data?.jobs ??
     []
-  ).map(
-    normalizeJob,
-  );
+  ).map(normalizeJob);
 }
 
 /*
- * อ่าน Job ที่ HR เลือก
+ * =========================================================
+ * SELECTED JOB STORAGE
+ * =========================================================
  */
+
 async function getSelectedJob(): Promise<
   ExtensionJob | null
 > {
@@ -176,16 +212,12 @@ async function getSelectedJob(): Promise<
   ) ?? null;
 }
 
-/*
- * Save Job ที่ HR เลือก
- */
 async function setSelectedJob(
   job: ExtensionJob | null,
 ): Promise<void> {
   if (job) {
     await chrome.storage.local.set({
-      selectedJob:
-        job,
+      selectedJob: job,
     });
 
     return;
@@ -197,8 +229,11 @@ async function setSelectedJob(
 }
 
 /*
- * วิเคราะห์ Facebook Post
+ * =========================================================
+ * FACEBOOK AI ANALYSIS
+ * =========================================================
  */
+
 async function analyzeFacebookPost(
   message: Extract<
     ExtensionMessage,
@@ -219,19 +254,32 @@ async function analyzeFacebookPost(
     );
   }
 
-  if (
-    !post?.text?.trim()
-  ) {
+  if (!post?.text?.trim()) {
     throw new Error(
       "Facebook post text is empty",
     );
   }
 
+  console.log(
+    "[HR ATS Extension] Analyzing Facebook post",
+    {
+      postId:
+        post.id,
+
+      jobId:
+        job.id,
+
+      jobTitle:
+        job.title,
+    },
+  );
+
   const response =
     await fetch(
       `${ATS_API_BASE_URL}/candidate-imports/analyze-post`,
       {
-        method: "POST",
+        method:
+          "POST",
 
         credentials:
           "include",
@@ -244,48 +292,50 @@ async function analyzeFacebookPost(
             "application/json",
         },
 
-        body: JSON.stringify({
-          source:
-            "facebook",
+        body:
+          JSON.stringify({
+            source:
+              "facebook",
 
-          source_url:
-            post.url ??
-            null,
+            source_url:
+              post.url ??
+              null,
 
-          raw_text:
-            post.text,
+            raw_text:
+              post.text,
 
-          /*
-           * สำคัญ:
-           * Backend จะใช้ job_id
-           * query Job จริงจาก Database
-           */
-          job_id:
-            job.id,
+            /*
+             * Backend ใช้ Job ID
+             * เพื่อดึง JD จาก Database
+             */
+            job_id:
+              job.id,
 
-          /*
-           * ส่งไว้เพื่อ backward compatibility
-           */
-          target_position:
-            job.title,
-        }),
+            /*
+             * ส่งไว้เผื่อ Backend
+             * version เก่ายังใช้อยู่
+             */
+            target_position:
+              job.title,
+          }),
       },
     );
 
   if (!response.ok) {
-    const message =
+    const errorMessage =
       await parseErrorMessage(
         response,
         `Could not analyze Facebook post (${response.status})`,
       );
 
     throw new Error(
-      message,
+      errorMessage,
     );
   }
 
   const body =
-    (await response.json()) as ApiSuccess<CandidatePostAnalysis>;
+    (await response.json()) as
+    ApiSuccess<CandidatePostAnalysis>;
 
   if (!body.data) {
     throw new Error(
@@ -297,8 +347,11 @@ async function analyzeFacebookPost(
 }
 
 /*
- * Save Candidate Lead เข้า ATS
+ * =========================================================
+ * SAVE CANDIDATE LEAD
+ * =========================================================
  */
+
 async function createCandidateLead(
   payload: CreateCandidateLeadPayload,
 ): Promise<CandidateLead> {
@@ -311,12 +364,9 @@ async function createCandidateLead(
     await fetch(
       `${ATS_API_BASE_URL}/candidate-leads`,
       {
-        method: "POST",
+        method:
+          "POST",
 
-        /*
-         * ถ้า ATS authentication
-         * ใช้ cookie ต้องมีบรรทัดนี้
-         */
         credentials:
           "include",
 
@@ -382,6 +432,105 @@ async function createCandidateLead(
   return body.data;
 }
 
+/*
+ * =========================================================
+ * GENERATE SEARCH QUERIES
+ * =========================================================
+ */
+
+async function generateSearchQueries(
+  jobId: string,
+): Promise<SearchQueriesResult> {
+  if (!jobId?.trim()) {
+    throw new Error(
+      "Job ID is required",
+    );
+  }
+
+  console.log(
+    "[HR ATS Extension] Generating search queries",
+    {
+      jobId,
+    },
+  );
+
+  const response =
+    await fetch(
+      `${ATS_API_BASE_URL}/jobs/${encodeURIComponent(
+        jobId,
+      )}/search-queries`,
+      {
+        method:
+          "POST",
+
+        credentials:
+          "include",
+
+        headers: {
+          Accept:
+            "application/json",
+
+          "Content-Type":
+            "application/json",
+        },
+      },
+    );
+
+  if (!response.ok) {
+    const message =
+      await parseErrorMessage(
+        response,
+        `Could not generate search queries (${response.status})`,
+      );
+
+    throw new Error(
+      message,
+    );
+  }
+
+  const body =
+    (await response.json()) as
+    ApiSuccess<SearchQueriesResult>;
+
+  if (!body.data) {
+    throw new Error(
+      "Search query result was not returned",
+    );
+  }
+
+  if (
+    !Array.isArray(
+      body.data.queries,
+    )
+  ) {
+    throw new Error(
+      "Invalid search query response",
+    );
+  }
+
+  console.log(
+    "[HR ATS Extension] Search queries generated",
+    {
+      jobId:
+        body.data.job_id,
+
+      jobTitle:
+        body.data.job_title,
+
+      queries:
+        body.data.queries,
+    },
+  );
+
+  return body.data;
+}
+
+/*
+ * =========================================================
+ * MESSAGE LISTENER
+ * =========================================================
+ */
+
 chrome.runtime.onMessage.addListener(
   (
     message: ExtensionMessage,
@@ -389,8 +538,11 @@ chrome.runtime.onMessage.addListener(
     sendResponse,
   ) => {
     /*
+     * -----------------------------------------------------
      * GET OPEN JOBS
+     * -----------------------------------------------------
      */
+
     if (
       message.type ===
       "GET_OPEN_JOBS"
@@ -417,6 +569,11 @@ chrome.runtime.onMessage.addListener(
           (
             error: unknown,
           ) => {
+            console.error(
+              "[HR ATS Extension] Could not load jobs",
+              error,
+            );
+
             sendResponse({
               success:
                 false,
@@ -429,12 +586,19 @@ chrome.runtime.onMessage.addListener(
           },
         );
 
+      /*
+       * สำคัญ:
+       * บอก Chrome ว่าจะตอบ async
+       */
       return true;
     }
 
     /*
+     * -----------------------------------------------------
      * GET SELECTED JOB
+     * -----------------------------------------------------
      */
+
     if (
       message.type ===
       "GET_SELECTED_JOB"
@@ -461,6 +625,11 @@ chrome.runtime.onMessage.addListener(
           (
             error: unknown,
           ) => {
+            console.error(
+              "[HR ATS Extension] Could not load selected job",
+              error,
+            );
+
             sendResponse({
               success:
                 false,
@@ -477,8 +646,11 @@ chrome.runtime.onMessage.addListener(
     }
 
     /*
+     * -----------------------------------------------------
      * SET SELECTED JOB
+     * -----------------------------------------------------
      */
+
     if (
       message.type ===
       "SET_SELECTED_JOB"
@@ -487,7 +659,56 @@ chrome.runtime.onMessage.addListener(
         message.payload.job,
       )
         .then(
-          () => {
+          async () => {
+            /*
+             * แจ้ง Content Script
+             * ว่า Job เปลี่ยนแล้ว
+             */
+            try {
+              const tabs =
+                await chrome.tabs.query({
+                  url: [
+                    "*://*.facebook.com/*",
+                  ],
+                });
+
+              for (
+                const tab
+                of tabs
+              ) {
+                if (!tab.id) {
+                  continue;
+                }
+
+                try {
+                  await chrome.tabs.sendMessage(
+                    tab.id,
+                    {
+                      type:
+                        "SELECTED_JOB_CHANGED",
+
+                      payload: {
+                        job:
+                          message.payload.job,
+                      },
+                    },
+                  );
+                } catch {
+                  /*
+                   * Tab อาจยังไม่มี content script
+                   * ไม่ถือเป็น error
+                   */
+                }
+              }
+            } catch (
+            error
+            ) {
+              console.warn(
+                "[HR ATS Extension] Could not notify Facebook tabs",
+                error,
+              );
+            }
+
             sendResponse({
               success:
                 true,
@@ -501,6 +722,11 @@ chrome.runtime.onMessage.addListener(
           (
             error: unknown,
           ) => {
+            console.error(
+              "[HR ATS Extension] Could not save selected job",
+              error,
+            );
+
             sendResponse({
               success:
                 false,
@@ -517,8 +743,11 @@ chrome.runtime.onMessage.addListener(
     }
 
     /*
-     * AI ANALYZE FACEBOOK POST
+     * -----------------------------------------------------
+     * ANALYZE FACEBOOK POST
+     * -----------------------------------------------------
      */
+
     if (
       message.type ===
       "ANALYZE_FACEBOOK_POST"
@@ -562,8 +791,11 @@ chrome.runtime.onMessage.addListener(
     }
 
     /*
+     * -----------------------------------------------------
      * SAVE CANDIDATE LEAD
+     * -----------------------------------------------------
      */
+
     if (
       message.type ===
       "SAVE_CANDIDATE_LEAD"
@@ -596,11 +828,6 @@ chrome.runtime.onMessage.addListener(
           (
             error: unknown,
           ) => {
-            const message =
-              error instanceof Error
-                ? error.message
-                : "Could not save candidate lead";
-
             console.error(
               "[HR ATS Extension] Candidate lead API failed",
               error,
@@ -610,22 +837,158 @@ chrome.runtime.onMessage.addListener(
               success:
                 false,
 
-              message,
+              message:
+                error instanceof Error
+                  ? error.message
+                  : "Could not save candidate lead",
             });
           },
         );
 
       /*
        * สำคัญมาก
-       *
-       * ต้อง return true
-       * เพราะ fetch เป็น async
-       * ไม่อย่างนั้น message channel
-       * จะถูกปิดก่อน sendResponse()
+       * fetch เป็น async
+       */
+      return true;
+    }
+
+    /*
+     * -----------------------------------------------------
+     * GENERATE SEARCH QUERIES
+     * -----------------------------------------------------
+     */
+
+    if (
+      message.type ===
+      "GENERATE_SEARCH_QUERIES"
+    ) {
+      console.log(
+        "[HR ATS Extension] GENERATE_SEARCH_QUERIES received",
+        message.payload,
+      );
+
+      void generateSearchQueries(
+        message.payload.jobId,
+      )
+        .then(
+          (result) => {
+            sendResponse({
+              success:
+                true,
+
+              data:
+                result,
+            });
+          },
+        )
+        .catch(
+          (
+            error: unknown,
+          ) => {
+            console.error(
+              "[HR ATS Extension] Generate search queries failed",
+              error,
+            );
+
+            sendResponse({
+              success:
+                false,
+
+              message:
+                error instanceof Error
+                  ? error.message
+                  : "Could not generate search queries",
+            });
+          },
+        );
+
+      /*
+       * สำคัญ:
+       * ต้อง return true เพราะรอ API
        */
       return true;
     }
 
     return false;
   },
+);
+
+/*
+ * =========================================================
+ * STORAGE CHANGE LISTENER
+ * =========================================================
+ *
+ * กรณี selectedJob ถูกแก้จากที่อื่น
+ * ให้แจ้ง Facebook Content Script ด้วย
+ */
+
+chrome.storage.onChanged.addListener(
+  (
+    changes,
+    areaName,
+  ) => {
+    if (
+      areaName !==
+      "local" ||
+      !changes.selectedJob
+    ) {
+      return;
+    }
+
+    const selectedJob =
+      (changes.selectedJob
+        .newValue as
+        | ExtensionJob
+        | undefined) ??
+      null;
+
+    console.log(
+      "[HR ATS Extension] Selected job changed from storage",
+      selectedJob,
+    );
+
+    void chrome.tabs
+      .query({
+        url: [
+          "*://*.facebook.com/*",
+        ],
+      })
+      .then(
+        async (
+          tabs,
+        ) => {
+          for (
+            const tab
+            of tabs
+          ) {
+            if (!tab.id) {
+              continue;
+            }
+
+            try {
+              await chrome.tabs.sendMessage(
+                tab.id,
+                {
+                  type:
+                    "SELECTED_JOB_CHANGED",
+
+                  payload: {
+                    job:
+                      selectedJob,
+                  },
+                },
+              );
+            } catch {
+              /*
+               * Content script อาจยังไม่ถูก inject
+               */
+            }
+          }
+        },
+      );
+  },
+);
+
+console.log(
+  "[HR ATS Extension] Background service worker loaded",
 );

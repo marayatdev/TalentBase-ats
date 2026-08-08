@@ -41,9 +41,18 @@ export interface SaveCandidateLeadMessage {
   payload: CreateCandidateLeadPayload;
 }
 
+export interface GenerateSearchQueriesMessage {
+  type: "GENERATE_SEARCH_QUERIES";
+
+  payload: {
+    jobId: string;
+  };
+}
+
 export type ExtensionMessage =
   | GetJobsMessage
   | GetSelectedJobMessage
   | SetSelectedJobMessage
   | AnalyzeFacebookPostMessage
-  | SaveCandidateLeadMessage;
+  | SaveCandidateLeadMessage
+  | GenerateSearchQueriesMessage;
