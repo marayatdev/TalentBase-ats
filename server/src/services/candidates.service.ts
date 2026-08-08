@@ -336,13 +336,13 @@ export class CandidateService {
       return;
     }
 
-    if (email && duplicate.email === email) {
-      throw new AppError("มีผู้สมัครที่ใช้อีเมลนี้อยู่แล้ว", 409);
-    }
+    // if (email && duplicate.email === email) {
+    //   throw new AppError("มีผู้สมัครที่ใช้อีเมลนี้อยู่แล้ว", 409);
+    // }
 
-    if (phone && duplicate.phone === phone) {
-      throw new AppError("มีผู้สมัครที่ใช้เบอร์โทรนี้อยู่แล้ว", 409);
-    }
+    // if (phone && duplicate.phone === phone) {
+    //   throw new AppError("มีผู้สมัครที่ใช้เบอร์โทรนี้อยู่แล้ว", 409);
+    // }
   }
 
   private parseId(id: string): bigint {
