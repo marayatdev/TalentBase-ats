@@ -1053,17 +1053,47 @@ function scanFacebookPosts(): FacebookPostMatch[] {
             )
           ) {
             if (
-              postMaxAgeDays !==
-              null &&
+              postMaxAgeDays !== null &&
               !parsedPost.createdAtDate
             ) {
-              skippedUnknownDate +=
-                1;
-            } else {
-              skippedByAge +=
-                1;
+              skippedUnknownDate += 1;
+
+              /*
+               * Facebook อาจ rerender แล้วทำให้
+               * parser อ่านวันที่ไม่ได้ชั่วคราว
+               *
+               * ถ้ามี AI result เดิมอยู่แล้ว
+               * อย่าเพิ่งลบ toolbar
+               */
+              const cachedAnalysis =
+                analysisCache.get(
+                  parsedPost.id,
+                );
+
+              if (
+                cachedAnalysis &&
+                isAcceptedAnalysis(
+                  cachedAnalysis,
+                )
+              ) {
+                updatePostUI(
+                  filterFacebookPost(
+                    parsedPost,
+                    defaultFilterConfig,
+                  ),
+                  cachedAnalysis,
+                );
+              }
+
+              return null;
             }
 
+            skippedByAge += 1;
+
+            /*
+             * กรณีรู้วันที่จริงและเกินช่วงที่ HR เลือก
+             * ลบได้
+             */
             removePostMatchUI(
               article,
             );

@@ -202,17 +202,27 @@ export function renderPostMatchUI(
   post: FacebookPostMatch,
   analysis: CandidatePostAnalysis,
 ): void {
-  if (
-    article.getAttribute(
-      MATCHED_ATTRIBUTE,
-    ) === "true" ||
+  const existingToolbar =
     article.querySelector(
       `[${TOOLBAR_ATTRIBUTE}]`,
-    )
-  ) {
+    );
+
+  if (existingToolbar) {
+    /*
+     * Toolbar ยังอยู่จริง
+     * ไม่ต้อง render ซ้ำ
+     */
     return;
   }
 
+  /*
+   * Facebook อาจ rerender children
+   * แล้วลบ toolbar ของ Extension ออก
+   * แต่ custom attribute บน article ยังอยู่
+   *
+   * เพราะฉะนั้นห้ามใช้ MATCHED_ATTRIBUTE
+   * เป็นเงื่อนไข return
+   */
   article.setAttribute(
     MATCHED_ATTRIBUTE,
     "true",
