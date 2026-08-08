@@ -1,8 +1,19 @@
-import type { ExtensionJob } from "../types/job";
-import type { ExtensionMessage } from "../types/messages";
+import type {
+  ExtensionJob,
+} from "../types/job";
+
+import type {
+  ExtensionMessage,
+} from "../types/messages";
+
 import type {
   CandidatePostAnalysis,
 } from "../types/facebook-post";
+
+import type {
+  CandidateLead,
+  CreateCandidateLeadPayload,
+} from "../types/candidate-lead";
 
 const ATS_API_BASE_URL =
   "http://localhost:8000/api";
@@ -12,6 +23,12 @@ interface ApiSuccess<T> {
   status: number;
   message: string;
   data: T;
+}
+
+interface ApiErrorResponse {
+  success?: boolean;
+  status?: number;
+  message?: string;
 }
 
 interface JobsResponse {
@@ -24,20 +41,20 @@ interface JobsResponse {
     requirements?: string | null;
 
     minimum_experience_years?:
-      | string
-      | number
-      | null;
+    | string
+    | number
+    | null;
 
     employment_type:
-      | "full_time"
-      | "part_time"
-      | "contract"
-      | "internship";
+    | "full_time"
+    | "part_time"
+    | "contract"
+    | "internship";
 
     status:
-      | "draft"
-      | "open"
-      | "closed";
+    | "draft"
+    | "open"
+    | "closed";
   }>;
 }
 
@@ -47,31 +64,28 @@ interface ExtensionResponse<T> {
   message?: string;
 }
 
-interface ApiErrorResponse {
-  success?: boolean;
-  status?: number;
-  message?: string;
-}
-
 function normalizeJob(
   job: JobsResponse["jobs"][number],
 ): ExtensionJob {
   return {
-    id: String(job.id),
+    id:
+      String(job.id),
 
     title:
       job.title,
 
     description:
-      job.description ?? null,
+      job.description ??
+      null,
 
     requirements:
-      job.requirements ?? null,
+      job.requirements ??
+      null,
 
     minimum_experience_years:
       Number(
         job.minimum_experience_years ??
-          0,
+        0,
       ),
 
     employment_type:
@@ -99,6 +113,9 @@ async function parseErrorMessage(
   }
 }
 
+/*
+ * โหลด Job ที่เปิดรับสมัครอยู่
+ */
 async function getOpenJobs(): Promise<
   ExtensionJob[]
 > {
@@ -134,12 +151,16 @@ async function getOpenJobs(): Promise<
     (await response.json()) as ApiSuccess<JobsResponse>;
 
   return (
-    body.data.jobs ?? []
+    body.data.jobs ??
+    []
   ).map(
     normalizeJob,
   );
 }
 
+/*
+ * อ่าน Job ที่ HR เลือก
+ */
 async function getSelectedJob(): Promise<
   ExtensionJob | null
 > {
@@ -150,11 +171,14 @@ async function getSelectedJob(): Promise<
 
   return (
     stored.selectedJob as
-      | ExtensionJob
-      | undefined
+    | ExtensionJob
+    | undefined
   ) ?? null;
 }
 
+/*
+ * Save Job ที่ HR เลือก
+ */
 async function setSelectedJob(
   job: ExtensionJob | null,
 ): Promise<void> {
@@ -172,12 +196,15 @@ async function setSelectedJob(
   );
 }
 
+/*
+ * วิเคราะห์ Facebook Post
+ */
 async function analyzeFacebookPost(
   message: Extract<
     ExtensionMessage,
     {
       type:
-        "ANALYZE_FACEBOOK_POST";
+      "ANALYZE_FACEBOOK_POST";
     }
   >,
 ): Promise<CandidatePostAnalysis> {
@@ -229,30 +256,18 @@ async function analyzeFacebookPost(
             post.text,
 
           /*
-           * ส่ง Job ID ให้ Backend
-           * ไป query Job จากฐานข้อมูล
+           * สำคัญ:
+           * Backend จะใช้ job_id
+           * query Job จริงจาก Database
            */
           job_id:
             job.id,
 
           /*
-           * ส่งค่าเหล่านี้ไว้รองรับ
-           * Backend เวอร์ชันเดิมด้วย
+           * ส่งไว้เพื่อ backward compatibility
            */
           target_position:
             job.title,
-
-          job_description:
-            job.description,
-
-          job_requirements:
-            job.requirements,
-
-          minimum_experience_years:
-            job.minimum_experience_years,
-
-          employment_type:
-            job.employment_type,
         }),
       },
     );
@@ -281,12 +296,101 @@ async function analyzeFacebookPost(
   return body.data;
 }
 
+/*
+ * Save Candidate Lead เข้า ATS
+ */
+async function createCandidateLead(
+  payload: CreateCandidateLeadPayload,
+): Promise<CandidateLead> {
+  console.log(
+    "[HR ATS Extension] Sending candidate lead to ATS",
+    payload,
+  );
+
+  const response =
+    await fetch(
+      `${ATS_API_BASE_URL}/candidate-leads`,
+      {
+        method: "POST",
+
+        /*
+         * ถ้า ATS authentication
+         * ใช้ cookie ต้องมีบรรทัดนี้
+         */
+        credentials:
+          "include",
+
+        headers: {
+          Accept:
+            "application/json",
+
+          "Content-Type":
+            "application/json",
+        },
+
+        body:
+          JSON.stringify(
+            payload,
+          ),
+      },
+    );
+
+  let body:
+    | ApiSuccess<CandidateLead>
+    | ApiErrorResponse;
+
+  try {
+    body =
+      (await response.json()) as
+      | ApiSuccess<CandidateLead>
+      | ApiErrorResponse;
+  } catch {
+    throw new Error(
+      `Could not save candidate lead (${response.status})`,
+    );
+  }
+
+  console.log(
+    "[HR ATS Extension] Candidate lead API response",
+    {
+      status:
+        response.status,
+
+      body,
+    },
+  );
+
+  if (
+    !response.ok ||
+    body.success !== true
+  ) {
+    throw new Error(
+      body.message ??
+      `Could not save candidate lead (${response.status})`,
+    );
+  }
+
+  if (
+    !("data" in body) ||
+    !body.data
+  ) {
+    throw new Error(
+      "Candidate lead response did not contain data",
+    );
+  }
+
+  return body.data;
+}
+
 chrome.runtime.onMessage.addListener(
   (
     message: ExtensionMessage,
     _sender,
     sendResponse,
   ) => {
+    /*
+     * GET OPEN JOBS
+     */
     if (
       message.type ===
       "GET_OPEN_JOBS"
@@ -313,30 +417,24 @@ chrome.runtime.onMessage.addListener(
           (
             error: unknown,
           ) => {
-            const response: ExtensionResponse<never> =
-              {
-                success:
-                  false,
+            sendResponse({
+              success:
+                false,
 
-                message:
-                  error instanceof
-                  Error
-                    ? error.message
-                    : "Could not load open jobs",
-              };
-
-            sendResponse(
-              response,
-            );
+              message:
+                error instanceof Error
+                  ? error.message
+                  : "Could not load open jobs",
+            });
           },
         );
 
-      /*
-       * บอก Chrome ว่าจะตอบกลับแบบ async
-       */
       return true;
     }
 
+    /*
+     * GET SELECTED JOB
+     */
     if (
       message.type ===
       "GET_SELECTED_JOB"
@@ -363,27 +461,24 @@ chrome.runtime.onMessage.addListener(
           (
             error: unknown,
           ) => {
-            const response: ExtensionResponse<never> =
-              {
-                success:
-                  false,
+            sendResponse({
+              success:
+                false,
 
-                message:
-                  error instanceof
-                  Error
-                    ? error.message
-                    : "Could not load selected job",
-              };
-
-            sendResponse(
-              response,
-            );
+              message:
+                error instanceof Error
+                  ? error.message
+                  : "Could not load selected job",
+            });
           },
         );
 
       return true;
     }
 
+    /*
+     * SET SELECTED JOB
+     */
     if (
       message.type ===
       "SET_SELECTED_JOB"
@@ -393,45 +488,37 @@ chrome.runtime.onMessage.addListener(
       )
         .then(
           () => {
-            const response: ExtensionResponse<null> =
-              {
-                success:
-                  true,
+            sendResponse({
+              success:
+                true,
 
-                data:
-                  null,
-              };
-
-            sendResponse(
-              response,
-            );
+              data:
+                null,
+            });
           },
         )
         .catch(
           (
             error: unknown,
           ) => {
-            const response: ExtensionResponse<never> =
-              {
-                success:
-                  false,
+            sendResponse({
+              success:
+                false,
 
-                message:
-                  error instanceof
-                  Error
-                    ? error.message
-                    : "Could not save selected job",
-              };
-
-            sendResponse(
-              response,
-            );
+              message:
+                error instanceof Error
+                  ? error.message
+                  : "Could not save selected job",
+            });
           },
         );
 
       return true;
     }
 
+    /*
+     * AI ANALYZE FACEBOOK POST
+     */
     if (
       message.type ===
       "ANALYZE_FACEBOOK_POST"
@@ -441,42 +528,101 @@ chrome.runtime.onMessage.addListener(
       )
         .then(
           (analysis) => {
-            const response: ExtensionResponse<CandidatePostAnalysis> =
-              {
-                success:
-                  true,
+            sendResponse({
+              success:
+                true,
 
-                data:
-                  analysis,
-              };
-
-            sendResponse(
-              response,
-            );
+              data:
+                analysis,
+            });
           },
         )
         .catch(
           (
             error: unknown,
           ) => {
-            const response: ExtensionResponse<never> =
-              {
-                success:
-                  false,
-
-                message:
-                  error instanceof
-                  Error
-                    ? error.message
-                    : "Could not analyze Facebook post",
-              };
-
-            sendResponse(
-              response,
+            console.error(
+              "[HR ATS Extension] Facebook analysis API failed",
+              error,
             );
+
+            sendResponse({
+              success:
+                false,
+
+              message:
+                error instanceof Error
+                  ? error.message
+                  : "Could not analyze Facebook post",
+            });
           },
         );
 
+      return true;
+    }
+
+    /*
+     * SAVE CANDIDATE LEAD
+     */
+    if (
+      message.type ===
+      "SAVE_CANDIDATE_LEAD"
+    ) {
+      console.log(
+        "[HR ATS Extension] SAVE_CANDIDATE_LEAD received",
+        message.payload,
+      );
+
+      void createCandidateLead(
+        message.payload,
+      )
+        .then(
+          (lead) => {
+            console.log(
+              "[HR ATS Extension] Candidate lead created",
+              lead,
+            );
+
+            sendResponse({
+              success:
+                true,
+
+              data:
+                lead,
+            });
+          },
+        )
+        .catch(
+          (
+            error: unknown,
+          ) => {
+            const message =
+              error instanceof Error
+                ? error.message
+                : "Could not save candidate lead";
+
+            console.error(
+              "[HR ATS Extension] Candidate lead API failed",
+              error,
+            );
+
+            sendResponse({
+              success:
+                false,
+
+              message,
+            });
+          },
+        );
+
+      /*
+       * สำคัญมาก
+       *
+       * ต้อง return true
+       * เพราะ fetch เป็น async
+       * ไม่อย่างนั้น message channel
+       * จะถูกปิดก่อน sendResponse()
+       */
       return true;
     }
 

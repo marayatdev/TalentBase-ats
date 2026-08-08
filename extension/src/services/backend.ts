@@ -36,9 +36,9 @@ export async function analyzeFacebookPost(
   const body = (await response.json()) as
     | ApiSuccess<CandidatePostAnalysis>
     | {
-        success: false;
-        message?: string;
-      };
+      success: false;
+      message?: string;
+    };
 
   if (!response.ok || !body.success) {
     throw new Error(body.message ?? "AI post analysis failed");
@@ -63,9 +63,9 @@ export async function createCandidateLead(
   const body = (await response.json()) as
     | ApiSuccess<CandidateLead>
     | {
-        success: false;
-        message?: string;
-      };
+      success: false;
+      message?: string;
+    };
 
   if (!response.ok || !body.success) {
     throw new Error(body.message ?? "Could not save candidate lead");

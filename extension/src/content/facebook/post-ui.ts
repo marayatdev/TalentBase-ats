@@ -3,8 +3,15 @@ import type {
   FacebookPostMatch,
 } from "../../types/facebook-post";
 
-const TOOLBAR_ATTRIBUTE = "data-hr-ats-toolbar";
-const MATCHED_ATTRIBUTE = "data-hr-ats-matched";
+import type {
+  ExtensionJob,
+} from "../../types/job";
+
+const TOOLBAR_ATTRIBUTE =
+  "data-hr-ats-toolbar";
+
+const MATCHED_ATTRIBUTE =
+  "data-hr-ats-matched";
 
 function createButton(
   label: string,
@@ -14,42 +21,80 @@ function createButton(
     onClick: () => void;
   },
 ): HTMLButtonElement {
-  const button = document.createElement("button");
+  const button =
+    document.createElement(
+      "button",
+    );
 
-  button.type = "button";
-  button.textContent = label;
+  button.type =
+    "button";
 
-  Object.assign(button.style, {
-    border: "none",
-    borderRadius: "8px",
-    padding: "8px 12px",
-    cursor: "pointer",
-    fontSize: "12px",
-    fontWeight: "600",
-    lineHeight: "1.2",
-    background: options.background,
-    color: options.color,
-  });
+  button.textContent =
+    label;
 
-  button.addEventListener("click", (event) => {
-    event.preventDefault();
-    event.stopPropagation();
+  Object.assign(
+    button.style,
+    {
+      border:
+        "none",
 
-    options.onClick();
-  });
+      borderRadius:
+        "8px",
+
+      padding:
+        "8px 12px",
+
+      cursor:
+        "pointer",
+
+      fontSize:
+        "12px",
+
+      fontWeight:
+        "600",
+
+      lineHeight:
+        "1.2",
+
+      background:
+        options.background,
+
+      color:
+        options.color,
+    },
+  );
+
+  button.addEventListener(
+    "click",
+    (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+
+      options.onClick();
+    },
+  );
 
   return button;
 }
 
 function createText(
   value: string,
-  styles: Partial<CSSStyleDeclaration> = {},
+  styles: Partial<
+    CSSStyleDeclaration
+  > = {},
 ): HTMLSpanElement {
-  const element = document.createElement("span");
+  const element =
+    document.createElement(
+      "span",
+    );
 
-  element.textContent = value;
+  element.textContent =
+    value;
 
-  Object.assign(element.style, styles);
+  Object.assign(
+    element.style,
+    styles,
+  );
 
   return element;
 }
@@ -59,42 +104,97 @@ async function copyPostUrl(
   button: HTMLButtonElement,
 ): Promise<void> {
   if (!post.url) {
-    button.textContent = "URL not found";
+    button.textContent =
+      "URL not found";
 
-    window.setTimeout(() => {
-      button.textContent = "Copy URL";
-    }, 1_500);
+    window.setTimeout(
+      () => {
+        button.textContent =
+          "Copy URL";
+      },
+      1_500,
+    );
 
     return;
   }
 
   try {
-    await navigator.clipboard.writeText(post.url);
+    await navigator.clipboard.writeText(
+      post.url,
+    );
 
-    button.textContent = "Copied";
+    button.textContent =
+      "Copied";
 
-    window.setTimeout(() => {
-      button.textContent = "Copy URL";
-    }, 1_500);
+    window.setTimeout(
+      () => {
+        button.textContent =
+          "Copy URL";
+      },
+      1_500,
+    );
   } catch (error) {
-    console.error("[HR ATS Extension] Could not copy post URL", error);
+    console.error(
+      "[HR ATS Extension] Could not copy post URL",
+      error,
+    );
 
-    button.textContent = "Copy failed";
+    button.textContent =
+      "Copy failed";
 
-    window.setTimeout(() => {
-      button.textContent = "Copy URL";
-    }, 1_500);
+    window.setTimeout(
+      () => {
+        button.textContent =
+          "Copy URL";
+      },
+      1_500,
+    );
   }
 }
 
-export function removePostMatchUI(article: HTMLElement): void {
-  article.removeAttribute(MATCHED_ATTRIBUTE);
+async function getSelectedJob(): Promise<
+  ExtensionJob | null
+> {
+  try {
+    const stored =
+      await chrome.storage.local.get(
+        "selectedJob",
+      );
 
-  article.style.removeProperty("outline");
-  article.style.removeProperty("outline-offset");
-  article.style.removeProperty("border-radius");
+    return (
+      stored.selectedJob as
+      | ExtensionJob
+      | undefined
+    ) ?? null;
+  } catch {
+    return null;
+  }
+}
 
-  article.querySelector<HTMLElement>(`[${TOOLBAR_ATTRIBUTE}]`)?.remove();
+export function removePostMatchUI(
+  article: HTMLElement,
+): void {
+  article.removeAttribute(
+    MATCHED_ATTRIBUTE,
+  );
+
+  article.style.removeProperty(
+    "outline",
+  );
+
+  article.style.removeProperty(
+    "outline-offset",
+  );
+
+  article.style.removeProperty(
+    "border-radius",
+  );
+
+  article
+    .querySelector(
+      `[${TOOLBAR_ATTRIBUTE}]`,
+    )
+    ?.remove();
 }
 
 export function renderPostMatchUI(
@@ -103,184 +203,458 @@ export function renderPostMatchUI(
   analysis: CandidatePostAnalysis,
 ): void {
   if (
-    article.getAttribute(MATCHED_ATTRIBUTE) === "true" ||
-    article.querySelector(`[${TOOLBAR_ATTRIBUTE}]`)
+    article.getAttribute(
+      MATCHED_ATTRIBUTE,
+    ) === "true" ||
+    article.querySelector(
+      `[${TOOLBAR_ATTRIBUTE}]`,
+    )
   ) {
     return;
   }
 
-  article.setAttribute(MATCHED_ATTRIBUTE, "true");
+  article.setAttribute(
+    MATCHED_ATTRIBUTE,
+    "true",
+  );
 
-  article.style.outline = "3px solid #1F4A3A";
-  article.style.outlineOffset = "4px";
-  article.style.borderRadius = "12px";
+  article.style.outline =
+    "3px solid #1F4A3A";
 
-  const toolbar = document.createElement("div");
+  article.style.outlineOffset =
+    "4px";
 
-  toolbar.setAttribute(TOOLBAR_ATTRIBUTE, "true");
+  article.style.borderRadius =
+    "12px";
 
-  Object.assign(toolbar.style, {
-    position: "relative",
-    zIndex: "20",
-    display: "flex",
-    flexDirection: "column",
-    gap: "8px",
-    margin: "10px",
-    padding: "12px",
-    border: "1px solid rgba(31, 74, 58, 0.2)",
-    borderRadius: "10px",
-    background: "#FAF6EC",
-    color: "#20261F",
-    fontFamily: "Arial, sans-serif",
-    boxShadow: "0 4px 14px rgba(0, 0, 0, 0.12)",
-  });
+  const toolbar =
+    document.createElement(
+      "div",
+    );
 
-  const topRow = document.createElement("div");
+  toolbar.setAttribute(
+    TOOLBAR_ATTRIBUTE,
+    "true",
+  );
 
-  Object.assign(topRow.style, {
-    display: "flex",
-    flexWrap: "wrap",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: "8px",
-  });
-
-  const titleGroup = document.createElement("div");
-
-  Object.assign(titleGroup.style, {
-    display: "flex",
-    flexDirection: "column",
-    gap: "2px",
-  });
-
-  const title = createText(`AI Match ${analysis.confidence}%`, {
-    fontSize: "13px",
-    fontWeight: "700",
-    color: "#1F4A3A",
-  });
-
-  const position = createText(
-    analysis.detected_position ?? analysis.target_position,
+  Object.assign(
+    toolbar.style,
     {
-      fontSize: "12px",
-      color: "rgba(32, 38, 31, 0.65)",
+      position:
+        "relative",
+
+      zIndex:
+        "20",
+
+      display:
+        "flex",
+
+      flexDirection:
+        "column",
+
+      gap:
+        "8px",
+
+      margin:
+        "10px",
+
+      padding:
+        "12px",
+
+      border:
+        "1px solid rgba(31, 74, 58, 0.2)",
+
+      borderRadius:
+        "10px",
+
+      background:
+        "#FAF6EC",
+
+      color:
+        "#20261F",
+
+      fontFamily:
+        "Arial, sans-serif",
+
+      boxShadow:
+        "0 4px 14px rgba(0, 0, 0, 0.12)",
     },
   );
 
-  titleGroup.append(title, position);
+  const topRow =
+    document.createElement(
+      "div",
+    );
 
-  const badge = createText("Job seeker", {
-    display: "inline-flex",
-    alignItems: "center",
-    borderRadius: "999px",
-    padding: "4px 8px",
-    background: "#DFF3E7",
-    color: "#17663A",
-    fontSize: "11px",
-    fontWeight: "700",
-  });
+  Object.assign(
+    topRow.style,
+    {
+      display:
+        "flex",
 
-  topRow.append(titleGroup, badge);
+      flexWrap:
+        "wrap",
 
-  const reason = createText(analysis.reason, {
-    fontSize: "12px",
-    lineHeight: "1.5",
-    color: "rgba(32, 38, 31, 0.75)",
-  });
+      alignItems:
+        "center",
 
-  const skillsRow = document.createElement("div");
+      justifyContent:
+        "space-between",
 
-  Object.assign(skillsRow.style, {
-    display: "flex",
-    flexWrap: "wrap",
-    gap: "6px",
-  });
+      gap:
+        "8px",
+    },
+  );
 
-  for (const skill of analysis.skills.slice(0, 8)) {
-    const skillBadge = createText(skill, {
-      borderRadius: "999px",
-      padding: "4px 8px",
-      background: "#EFE6D3",
-      color: "#20261F",
-      fontSize: "11px",
-    });
+  const titleGroup =
+    document.createElement(
+      "div",
+    );
 
-    skillsRow.append(skillBadge);
+  Object.assign(
+    titleGroup.style,
+    {
+      display:
+        "flex",
+
+      flexDirection:
+        "column",
+
+      gap:
+        "2px",
+    },
+  );
+
+  const title =
+    createText(
+      `AI Match ${analysis.confidence}%`,
+      {
+        fontSize:
+          "13px",
+
+        fontWeight:
+          "700",
+
+        color:
+          "#1F4A3A",
+      },
+    );
+
+  const position =
+    createText(
+      analysis.detected_position ??
+      analysis.target_position,
+      {
+        fontSize:
+          "12px",
+
+        color:
+          "rgba(32, 38, 31, 0.65)",
+      },
+    );
+
+  titleGroup.append(
+    title,
+    position,
+  );
+
+  const badge =
+    createText(
+      "Job seeker",
+      {
+        display:
+          "inline-flex",
+
+        alignItems:
+          "center",
+
+        borderRadius:
+          "999px",
+
+        padding:
+          "4px 8px",
+
+        background:
+          "#DFF3E7",
+
+        color:
+          "#17663A",
+
+        fontSize:
+          "11px",
+
+        fontWeight:
+          "700",
+      },
+    );
+
+  topRow.append(
+    titleGroup,
+    badge,
+  );
+
+  const reason =
+    createText(
+      analysis.reason,
+      {
+        fontSize:
+          "12px",
+
+        lineHeight:
+          "1.5",
+
+        color:
+          "rgba(32, 38, 31, 0.75)",
+      },
+    );
+
+  const skillsRow =
+    document.createElement(
+      "div",
+    );
+
+  Object.assign(
+    skillsRow.style,
+    {
+      display:
+        "flex",
+
+      flexWrap:
+        "wrap",
+
+      gap:
+        "6px",
+    },
+  );
+
+  for (
+    const skill
+    of analysis.skills.slice(
+      0,
+      8,
+    )
+  ) {
+    const skillBadge =
+      createText(
+        skill,
+        {
+          borderRadius:
+            "999px",
+
+          padding:
+            "4px 8px",
+
+          background:
+            "#EFE6D3",
+
+          color:
+            "#20261F",
+
+          fontSize:
+            "11px",
+        },
+      );
+
+    skillsRow.append(
+      skillBadge,
+    );
   }
 
-  const actions = document.createElement("div");
+  const actions =
+    document.createElement(
+      "div",
+    );
 
-  Object.assign(actions.style, {
-    display: "flex",
-    flexWrap: "wrap",
-    gap: "8px",
-    justifyContent: "flex-end",
-  });
+  Object.assign(
+    actions.style,
+    {
+      display:
+        "flex",
 
-  const copyButton = createButton("Copy URL", {
-    background: "#EFE6D3",
-    color: "#20261F",
+      flexWrap:
+        "wrap",
 
-    onClick: () => {
-      void copyPostUrl(post, copyButton);
+      gap:
+        "8px",
+
+      justifyContent:
+        "flex-end",
     },
-  });
+  );
 
-  const importButton = createButton("Save to ATS", {
-    background: "#1F4A3A",
-    color: "#FFFFFF",
+  const copyButton =
+    createButton(
+      "Copy URL",
+      {
+        background:
+          "#EFE6D3",
 
-    onClick: async () => {
-      importButton.disabled = true;
-      importButton.textContent = "Saving...";
+        color:
+          "#20261F",
 
-      try {
-        const response = await chrome.runtime.sendMessage({
-          type: "SAVE_CANDIDATE_LEAD",
+        onClick: () => {
+          void copyPostUrl(
+            post,
+            copyButton,
+          );
+        },
+      },
+    );
+
+  const importButton =
+    createButton(
+      "Save to ATS",
+      {
+        background:
+          "#1F4A3A",
+
+        color:
+          "#FFFFFF",
+
+        onClick: () => {
+          void saveCandidateLead();
+        },
+      },
+    );
+
+  async function saveCandidateLead(): Promise<void> {
+    importButton.disabled =
+      true;
+
+    importButton.textContent =
+      "Saving...";
+
+    try {
+      const selectedJob =
+        await getSelectedJob();
+
+      if (!selectedJob?.id) {
+        throw new Error(
+          "No job selected. Please select a job from the extension popup.",
+        );
+      }
+
+      if (!post.url) {
+        throw new Error(
+          "Facebook post URL was not found",
+        );
+      }
+
+      console.log(
+        "[HR ATS Extension] Saving candidate lead",
+        {
+          postId:
+            post.id,
+
+          jobId:
+            selectedJob.id,
+
+          jobTitle:
+            selectedJob.title,
+        },
+      );
+
+      const response =
+        await chrome.runtime.sendMessage({
+          type:
+            "SAVE_CANDIDATE_LEAD",
 
           payload: {
-            source: "facebook",
-            source_url: post.url,
-            raw_text: post.text,
+            source:
+              "facebook",
 
-            detected_name: analysis.full_name ?? post.author ?? null,
+            source_url:
+              post.url,
 
-            detected_email: analysis.email,
+            raw_text:
+              post.text,
 
-            detected_phone: analysis.phone,
+            detected_name:
+              analysis.full_name ??
+              post.author ??
+              null,
 
-            detected_position: analysis.detected_position,
+            detected_email:
+              analysis.email,
 
-            skills: analysis.skills,
+            detected_phone:
+              analysis.phone,
 
-            ai_confidence: analysis.confidence,
+            detected_position:
+              analysis.detected_position,
 
-            ai_reason: analysis.reason,
+            skills:
+              analysis.skills,
 
-            target_job_id: null,
+            ai_confidence:
+              analysis.confidence,
+
+            ai_reason:
+              analysis.reason,
+
+            /*
+             * สำคัญ:
+             * ใช้ Job ที่ HR เลือกจริง
+             */
+            target_job_id:
+              selectedJob.id,
           },
         });
 
-        if (!response?.success) {
-          throw new Error(response?.message ?? "Could not save candidate lead");
-        }
+      console.log(
+        "[HR ATS Extension] Save lead response",
+        response,
+      );
 
-        importButton.textContent = "Saved";
-        importButton.style.background = "#6B7280";
-
-        console.log("[HR ATS Extension] Candidate lead saved", response.data);
-      } catch (error) {
-        importButton.disabled = false;
-        importButton.textContent = "Save to ATS";
-
-        console.error("[HR ATS Extension] Save lead failed", error);
+      if (
+        !response?.success
+      ) {
+        throw new Error(
+          response?.message ??
+          "Could not save candidate lead",
+        );
       }
-    },
-  });
 
-  actions.append(copyButton, importButton);
+      importButton.disabled =
+        true;
 
-  toolbar.append(topRow, reason, skillsRow, actions);
+      importButton.textContent =
+        "Saved";
 
-  article.prepend(toolbar);
+      importButton.style.background =
+        "#6B7280";
+
+      console.log(
+        "[HR ATS Extension] Candidate lead saved",
+        response.data,
+      );
+    } catch (error) {
+      importButton.disabled =
+        false;
+
+      importButton.textContent =
+        "Save to ATS";
+
+      console.error(
+        "[HR ATS Extension] Save lead failed",
+        error,
+      );
+    }
+  }
+
+  actions.append(
+    copyButton,
+    importButton,
+  );
+
+  toolbar.append(
+    topRow,
+    reason,
+    skillsRow,
+    actions,
+  );
+
+  article.prepend(
+    toolbar,
+  );
 }
