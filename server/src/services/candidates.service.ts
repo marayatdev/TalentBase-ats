@@ -72,27 +72,27 @@ export class CandidateService {
 
       OR: search
         ? [
-            {
-              full_name: {
-                contains: search,
-              },
+          {
+            full_name: {
+              contains: search,
             },
-            {
-              email: {
-                contains: search,
-              },
+          },
+          {
+            email: {
+              contains: search,
             },
-            {
-              phone: {
-                contains: search,
-              },
+          },
+          {
+            phone: {
+              contains: search,
             },
-            {
-              current_position: {
-                contains: search,
-              },
+          },
+          {
+            current_position: {
+              contains: search,
             },
-          ]
+          },
+        ]
         : undefined,
     };
 
@@ -293,9 +293,9 @@ export class CandidateService {
       throw new AppError("ไม่พบข้อมูลผู้สมัคร", 404);
     }
 
-    if (candidate._count.applications > 0) {
-      throw new AppError("ไม่สามารถลบผู้สมัครที่มีประวัติการสมัครงานได้", 409);
-    }
+    // if (candidate._count.applications > 0) {
+    //   throw new AppError("ไม่สามารถลบผู้สมัครที่มีประวัติการสมัครงานได้", 409);
+    // }
 
     await prisma.candidates.delete({
       where: {
@@ -317,8 +317,8 @@ export class CandidateService {
       where: {
         id: excludeId
           ? {
-              not: excludeId,
-            }
+            not: excludeId,
+          }
           : undefined,
 
         OR: [...(email ? [{ email }] : []), ...(phone ? [{ phone }] : [])],
