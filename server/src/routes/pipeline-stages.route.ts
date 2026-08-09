@@ -10,19 +10,16 @@ router.post("/", authMiddleware, controller.create.bind(controller));
 
 router.post(
   "/default/:jobId",
-  authMiddleware,
   controller.createDefault.bind(controller),
 );
 
 router.get(
   "/job/:jobId",
-  authMiddleware,
   controller.findByJob.bind(controller),
 );
 
 router.patch(
   "/job/:jobId/reorder",
-  authMiddleware,
   controller.reorder.bind(controller),
 );
 
