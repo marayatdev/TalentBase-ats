@@ -1,9 +1,16 @@
 import "dotenv/config";
 
-import { PrismaPg } from "@prisma/adapter-pg";
-import { PrismaClient } from "../generated/prisma/client";
+import {
+  PrismaPg,
+} from "@prisma/adapter-pg";
 
-import { logger } from "../utils/logger";
+import {
+  PrismaClient,
+} from "../generated/prisma/client";
+
+import {
+  logger,
+} from "../utils/logger";
 
 const databaseUrl =
   process.env.DATABASE_URL;
@@ -14,14 +21,21 @@ if (!databaseUrl) {
   );
 }
 
+/*
+ * Runtime connection
+ *
+ * ใช้ DATABASE_URL
+ * ซึ่งสามารถชี้ไปที่ Supabase Transaction Pooler
+ * หรือ Session Pooler ได้
+ */
 const adapter =
   new PrismaPg({
     connectionString:
       databaseUrl,
 
     /*
-     * สำคัญสำหรับ Railway
-     * อย่าปล่อยให้ DB connection ค้างไม่มีกำหนด
+     * กัน Railway ค้างนาน
+     * หากเชื่อมต่อ DB ไม่ได้
      */
     connectionTimeoutMillis:
       10_000,
@@ -30,7 +44,8 @@ const adapter =
       30_000,
 
     /*
-     * เริ่มเล็กก่อนเพราะมี Supabase pooler อยู่แล้ว
+     * เริ่ม connection pool เล็กไว้ก่อน
+     * เพราะ Supabase มี pooler อยู่แล้ว
      */
     max:
       5,
