@@ -12,7 +12,7 @@ export default defineManifest({
 
   permissions: ["storage", "activeTab", "tabs"],
 
-  host_permissions: ["https://www.facebook.com/*", "http://localhost:8000/*"],
+  host_permissions: ["https://www.facebook.com/*", "http://localhost:8000/*", "https://talentbase-ats-production.up.railway.app/*"],
 
   action: {
     default_popup: "index.html",
