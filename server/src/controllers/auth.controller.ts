@@ -509,4 +509,73 @@ export class AuthController {
       });
     }
   };
+
+  public extensionLogin = async (
+    req: TypedRequestBody<User>,
+    res: Response,
+  ) => {
+    try {
+      const { email, password } = req.body;
+
+      if (!email || !password) {
+        res.status(400).json({
+          success: false,
+          message: "Email and password are required",
+        });
+        return;
+      }
+
+      const user =
+        await this.authService.getUserByEmail(email);
+
+      if (!user) {
+        res.status(401).json({
+          success: false,
+          message: "Invalid credentials",
+        });
+        return;
+      }
+
+      const valid =
+        await argon2.verify(
+          user.password,
+          password,
+        );
+
+      if (!valid) {
+        res.status(401).json({
+          success: false,
+          message: "Invalid credentials",
+        });
+        return;
+      }
+
+      const accessToken =
+        this.generateAccessToken(user);
+
+      res.status(200).json({
+        success: true,
+        data: {
+          accessToken,
+
+          user: {
+            id: user.id.toString(),
+            name: user.name,
+            email: user.email,
+            role: user.role,
+          },
+        },
+      });
+    } catch (error) {
+      logger.error(
+        "Extension login failed:",
+        error,
+      );
+
+      res.status(500).json({
+        success: false,
+        message: "Internal server error",
+      });
+    }
+  };
 }

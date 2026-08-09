@@ -14,6 +14,18 @@ interface ExtensionResponse<T> {
     message?: string;
 }
 
+interface ExtensionUser {
+    id: string;
+    name: string | null;
+    email: string;
+    role?: string;
+}
+
+interface AuthSession {
+    isAuthenticated: boolean;
+    user: ExtensionUser | null;
+}
+
 export default function Popup() {
     const [
         jobs,
@@ -40,6 +52,12 @@ export default function Popup() {
         setErrorMessage,
     ] = useState("");
 
+    const [email, setEmail] = useState("");
+    const [password, setPassword] = useState("");
+    const [isAuthenticated, setIsAuthenticated] = useState(false);
+    const [currentUser, setCurrentUser] = useState<ExtensionUser | null>(null);
+    const [isLoggingIn, setIsLoggingIn] = useState(false);
+
     const selectedJob =
         useMemo(
             () =>
@@ -54,8 +72,85 @@ export default function Popup() {
         );
 
     useEffect(() => {
-        void loadPopupData();
+        void initializePopup();
     }, []);
+
+    async function initializePopup(): Promise<void> {
+        setIsLoading(true);
+        setErrorMessage("");
+
+        try {
+            const response = (await chrome.runtime.sendMessage({
+                type: "GET_AUTH_SESSION",
+            })) as ExtensionResponse<AuthSession>;
+
+            if (!response.success || !response.data?.isAuthenticated) {
+                setIsAuthenticated(false);
+                setCurrentUser(null);
+                return;
+            }
+
+            setIsAuthenticated(true);
+            setCurrentUser(response.data.user);
+            await loadPopupData();
+        } catch (error) {
+            setErrorMessage(
+                error instanceof Error
+                    ? error.message
+                    : "Could not load extension session",
+            );
+        } finally {
+            setIsLoading(false);
+        }
+    }
+
+    async function handleLogin(): Promise<void> {
+        if (!email.trim() || !password) {
+            setErrorMessage("Please enter email and password");
+            return;
+        }
+
+        setIsLoggingIn(true);
+        setErrorMessage("");
+
+        try {
+            const response = (await chrome.runtime.sendMessage({
+                type: "EXTENSION_LOGIN",
+                payload: {
+                    email: email.trim(),
+                    password,
+                },
+            })) as ExtensionResponse<ExtensionUser>;
+
+            if (!response.success || !response.data) {
+                throw new Error(response.message ?? "Could not login");
+            }
+
+            setIsAuthenticated(true);
+            setCurrentUser(response.data);
+            setPassword("");
+            await loadPopupData();
+        } catch (error) {
+            setErrorMessage(
+                error instanceof Error ? error.message : "Could not login",
+            );
+        } finally {
+            setIsLoggingIn(false);
+        }
+    }
+
+    async function handleLogout(): Promise<void> {
+        await chrome.runtime.sendMessage({
+            type: "EXTENSION_LOGOUT",
+        });
+
+        setIsAuthenticated(false);
+        setCurrentUser(null);
+        setJobs([]);
+        setSelectedJobId("");
+        setPassword("");
+        setErrorMessage("");
+    }
 
     async function loadPopupData(): Promise<void> {
         setIsLoading(true);
@@ -272,6 +367,101 @@ export default function Popup() {
         }
     }
 
+    if (!isAuthenticated) {
+        return (
+            <main
+                style={{
+                    width: 360,
+                    padding: 16,
+                    fontFamily: "Inter, system-ui, sans-serif",
+                    color: "#20261F",
+                    background: "#FAF6EC",
+                }}
+            >
+                <h1 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>
+                    HR ATS Scanner
+                </h1>
+
+                <p style={{ marginTop: 6, fontSize: 12, lineHeight: 1.5, opacity: 0.65 }}>
+                    Sign in to TalentBase ATS before scanning candidates.
+                </p>
+
+                <input
+                    type="email"
+                    value={email}
+                    onChange={(event) => setEmail(event.target.value)}
+                    placeholder="Email"
+                    autoComplete="email"
+                    disabled={isLoggingIn || isLoading}
+                    style={{
+                        boxSizing: "border-box",
+                        width: "100%",
+                        minHeight: 40,
+                        marginTop: 14,
+                        borderRadius: 8,
+                        border: "1px solid rgba(32,38,31,0.15)",
+                        padding: "0 10px",
+                    }}
+                />
+
+                <input
+                    type="password"
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                    onKeyDown={(event) => {
+                        if (event.key === "Enter") void handleLogin();
+                    }}
+                    placeholder="Password"
+                    autoComplete="current-password"
+                    disabled={isLoggingIn || isLoading}
+                    style={{
+                        boxSizing: "border-box",
+                        width: "100%",
+                        minHeight: 40,
+                        marginTop: 8,
+                        borderRadius: 8,
+                        border: "1px solid rgba(32,38,31,0.15)",
+                        padding: "0 10px",
+                    }}
+                />
+
+                {errorMessage && (
+                    <div
+                        style={{
+                            marginTop: 10,
+                            borderRadius: 8,
+                            padding: 10,
+                            fontSize: 12,
+                            color: "#9F1D1D",
+                            background: "#FDECEC",
+                        }}
+                    >
+                        {errorMessage}
+                    </div>
+                )}
+
+                <button
+                    type="button"
+                    onClick={() => void handleLogin()}
+                    disabled={isLoggingIn || isLoading}
+                    style={{
+                        width: "100%",
+                        minHeight: 40,
+                        marginTop: 12,
+                        borderRadius: 8,
+                        border: 0,
+                        background: "#1F4A3A",
+                        color: "white",
+                        fontWeight: 600,
+                        cursor: isLoggingIn ? "not-allowed" : "pointer",
+                    }}
+                >
+                    {isLoggingIn ? "Signing in..." : "Sign in"}
+                </button>
+            </main>
+        );
+    }
+
     return (
         <main
             style={{
@@ -306,6 +496,36 @@ export default function Popup() {
                     Select the job used to evaluate
                     Facebook candidate posts.
                 </p>
+                {currentUser && (
+                    <div
+                        style={{
+                            marginTop: 10,
+                            display: "flex",
+                            justifyContent: "space-between",
+                            gap: 8,
+                            fontSize: 11,
+                        }}
+                    >
+                        <span style={{ opacity: 0.65 }}>
+                            {currentUser.name ?? currentUser.email}
+                        </span>
+                        <button
+                            type="button"
+                            onClick={() => void handleLogout()}
+                            style={{
+                                border: 0,
+                                padding: 0,
+                                background: "transparent",
+                                color: "#9F1D1D",
+                                cursor: "pointer",
+                                fontSize: 11,
+                                fontWeight: 600,
+                            }}
+                        >
+                            Logout
+                        </button>
+                    </div>
+                )}
             </header>
 
             <section

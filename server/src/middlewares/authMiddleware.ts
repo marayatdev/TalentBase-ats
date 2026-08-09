@@ -35,7 +35,14 @@ export const authMiddleware = (
   next: NextFunction,
 ): void => {
   try {
-    const accessToken = req.cookies?.accessToken;
+    const cookieAccessToken = req.cookies?.accessToken;
+    const authorization = req.headers.authorization;
+    const bearerAccessToken =
+      authorization?.startsWith("Bearer ")
+        ? authorization.slice(7).trim()
+        : undefined;
+
+    const accessToken = cookieAccessToken ?? bearerAccessToken;
 
     if (!accessToken) {
       res.status(401).json({
@@ -55,6 +62,13 @@ export const authMiddleware = (
       next();
       return;
     } catch {
+      if (bearerAccessToken) {
+        res.status(401).json({
+          message: "Access token expired or invalid. Please login again.",
+        });
+        return;
+      }
+
       const refreshToken = req.cookies?.refreshToken;
 
       if (!refreshToken) {

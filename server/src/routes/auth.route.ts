@@ -12,4 +12,9 @@ router.post("/logout", authController.logout);
 
 router.get("/me", authController.me);
 
+router.post(
+    "/extension-login",
+    authController.extensionLogin,
+);
+
 export default router;

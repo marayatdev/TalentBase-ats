@@ -16,7 +16,7 @@ import type {
 } from "../types/candidate-lead";
 
 const ATS_API_BASE_URL =
-  "http://localhost:8000/api";
+  "https://talentbase-ats-production.up.railway.app/api";
 
 interface ApiSuccess<T> {
   success: boolean;
@@ -62,6 +62,121 @@ interface ExtensionResponse<T> {
   success: boolean;
   data?: T;
   message?: string;
+}
+
+interface ExtensionUser {
+  id: string;
+  name: string | null;
+  email: string;
+  role?: string;
+}
+
+interface ExtensionAuthData {
+  accessToken: string;
+  user: ExtensionUser;
+}
+
+const ACCESS_TOKEN_KEY = "accessToken";
+const EXTENSION_USER_KEY = "extensionUser";
+
+async function getAccessToken(): Promise<string | null> {
+  const stored = await chrome.storage.local.get(ACCESS_TOKEN_KEY);
+  return typeof stored[ACCESS_TOKEN_KEY] === "string"
+    ? stored[ACCESS_TOKEN_KEY]
+    : null;
+}
+
+async function authenticatedFetch(
+  path: string,
+  options: RequestInit = {},
+): Promise<Response> {
+  const accessToken = await getAccessToken();
+
+  if (!accessToken) {
+    throw new Error("Please login to TalentBase ATS first");
+  }
+
+  const headers = new Headers(options.headers);
+  headers.set("Accept", "application/json");
+  headers.set("Authorization", `Bearer ${accessToken}`);
+
+  if (options.body && !(options.body instanceof FormData)) {
+    headers.set("Content-Type", "application/json");
+  }
+
+  const response = await fetch(`${ATS_API_BASE_URL}${path}`, {
+    ...options,
+    headers,
+  });
+
+  if (response.status === 401) {
+    await chrome.storage.local.remove([
+      ACCESS_TOKEN_KEY,
+      EXTENSION_USER_KEY,
+      "selectedJob",
+    ]);
+  }
+
+  return response;
+}
+
+async function login(
+  email: string,
+  password: string,
+): Promise<ExtensionUser> {
+  const response = await fetch(`${ATS_API_BASE_URL}/auth/extension-login`, {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ email, password }),
+  });
+
+  if (!response.ok) {
+    throw new Error(
+      await parseErrorMessage(response, `Login failed (${response.status})`),
+    );
+  }
+
+  const body = (await response.json()) as ApiSuccess<ExtensionAuthData>;
+
+  if (!body.data?.accessToken || !body.data.user) {
+    throw new Error("Login response did not contain an access token");
+  }
+
+  await chrome.storage.local.set({
+    [ACCESS_TOKEN_KEY]: body.data.accessToken,
+    [EXTENSION_USER_KEY]: body.data.user,
+  });
+
+  return body.data.user;
+}
+
+async function logout(): Promise<void> {
+  await chrome.storage.local.remove([
+    ACCESS_TOKEN_KEY,
+    EXTENSION_USER_KEY,
+    "selectedJob",
+  ]);
+}
+
+async function getAuthSession(): Promise<{
+  isAuthenticated: boolean;
+  user: ExtensionUser | null;
+}> {
+  const stored = await chrome.storage.local.get([
+    ACCESS_TOKEN_KEY,
+    EXTENSION_USER_KEY,
+  ]);
+
+  return {
+    isAuthenticated:
+      typeof stored[ACCESS_TOKEN_KEY] === "string" &&
+      stored[ACCESS_TOKEN_KEY].length > 0,
+    user:
+      (stored[EXTENSION_USER_KEY] as ExtensionUser | undefined) ?? null,
+  };
 }
 
 function normalizeJob(
@@ -120,13 +235,10 @@ async function getOpenJobs(): Promise<
   ExtensionJob[]
 > {
   const response =
-    await fetch(
-      `${ATS_API_BASE_URL}/jobs?page=1&page_size=100&status=open`,
+    await authenticatedFetch(
+      "/jobs?page=1&page_size=100&status=open",
       {
         method: "GET",
-
-        credentials:
-          "include",
 
         headers: {
           Accept:
@@ -228,13 +340,10 @@ async function analyzeFacebookPost(
   }
 
   const response =
-    await fetch(
-      `${ATS_API_BASE_URL}/candidate-imports/analyze-post`,
+    await authenticatedFetch(
+      "/candidate-imports/analyze-post",
       {
         method: "POST",
-
-        credentials:
-          "include",
 
         headers: {
           Accept:
@@ -308,8 +417,8 @@ async function createCandidateLead(
   );
 
   const response =
-    await fetch(
-      `${ATS_API_BASE_URL}/candidate-leads`,
+    await authenticatedFetch(
+      "/candidate-leads",
       {
         method: "POST",
 
@@ -317,8 +426,6 @@ async function createCandidateLead(
          * ถ้า ATS authentication
          * ใช้ cookie ต้องมีบรรทัดนี้
          */
-        credentials:
-          "include",
 
         headers: {
           Accept:
@@ -388,6 +495,67 @@ chrome.runtime.onMessage.addListener(
     _sender,
     sendResponse,
   ) => {
+    const authMessage = message as unknown as {
+      type: string;
+      payload?: {
+        email?: string;
+        password?: string;
+      };
+    };
+
+    if (authMessage.type === "EXTENSION_LOGIN") {
+      const email = authMessage.payload?.email?.trim() ?? "";
+      const password = authMessage.payload?.password ?? "";
+
+      if (!email || !password) {
+        sendResponse({
+          success: false,
+          message: "Email and password are required",
+        });
+        return false;
+      }
+
+      void login(email, password)
+        .then((user) => sendResponse({ success: true, data: user }))
+        .catch((error: unknown) =>
+          sendResponse({
+            success: false,
+            message: error instanceof Error ? error.message : "Could not login",
+          }),
+        );
+
+      return true;
+    }
+
+    if (authMessage.type === "EXTENSION_LOGOUT") {
+      void logout()
+        .then(() => sendResponse({ success: true, data: null }))
+        .catch((error: unknown) =>
+          sendResponse({
+            success: false,
+            message: error instanceof Error ? error.message : "Could not logout",
+          }),
+        );
+
+      return true;
+    }
+
+    if (authMessage.type === "GET_AUTH_SESSION") {
+      void getAuthSession()
+        .then((session) => sendResponse({ success: true, data: session }))
+        .catch((error: unknown) =>
+          sendResponse({
+            success: false,
+            message:
+              error instanceof Error
+                ? error.message
+                : "Could not load auth session",
+          }),
+        );
+
+      return true;
+    }
+
     /*
      * GET OPEN JOBS
      */
