@@ -8,11 +8,13 @@ const aiResumeController = new AIResumeController();
 
 router.post(
   "/:resumeId/parse",
+  authMiddleware,
   aiResumeController.parse.bind(aiResumeController),
 );
 
 router.get(
   "/:resumeId/result",
+  authMiddleware,
   aiResumeController.getResult.bind(aiResumeController),
 );
 

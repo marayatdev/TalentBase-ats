@@ -15,21 +15,24 @@ router.post(
 
 router.get(
   "/candidate/:candidateId",
+  authMiddleware,
   resumeController.findByCandidate.bind(resumeController),
 );
 
 router.get(
   "/:id",
+  authMiddleware,
   resumeController.findOne.bind(resumeController),
 );
 
 router.patch(
   "/:id/primary",
+  authMiddleware,
   resumeController.setPrimary.bind(resumeController),
 );
 
 router.delete(
-  "/:id",
+  "/:id", authMiddleware,
   resumeController.delete.bind(resumeController),
 );
 

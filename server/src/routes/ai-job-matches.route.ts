@@ -8,11 +8,13 @@ const controller = new AIJobMatchController();
 
 router.post(
   "/application/:applicationId",
+  authMiddleware,
   controller.analyze.bind(controller),
 );
 
 router.get(
   "/application/:applicationId",
+  authMiddleware,
   controller.getResult.bind(controller),
 );
 

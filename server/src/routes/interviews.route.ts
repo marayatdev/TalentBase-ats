@@ -13,6 +13,7 @@ const controller =
  */
 router.post(
   "/",
+  authMiddleware,
   controller.create.bind(controller),
 );
 
@@ -21,6 +22,7 @@ router.post(
  */
 router.get(
   "/application/:applicationId",
+  authMiddleware,
   controller.findByApplicationId.bind(controller),
 );
 
@@ -29,6 +31,7 @@ router.get(
  */
 router.patch(
   "/:id",
+  authMiddleware,
   controller.update.bind(controller),
 );
 
@@ -37,11 +40,13 @@ router.patch(
  */
 router.post(
   "/:id/cancel",
+  authMiddleware,
   controller.cancel.bind(controller),
 );
 
 router.get(
   "/:id",
+  authMiddleware,
   controller.findOne.bind(controller),
 );
 

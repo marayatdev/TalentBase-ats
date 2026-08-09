@@ -9,15 +9,15 @@ const candidateSearchQueryController =
     new CandidateSearchQueryController();
 
 
-router.post("/", jobController.create.bind(jobController));
+router.post("/", authMiddleware, jobController.create.bind(jobController));
 
-router.get("/", jobController.findAll.bind(jobController));
+router.get("/", authMiddleware, authMiddleware, jobController.findAll.bind(jobController));
 
-router.get("/:id", jobController.findOne.bind(jobController));
+router.get("/:id", authMiddleware, jobController.findOne.bind(jobController));
 
-router.patch("/:id", jobController.update.bind(jobController));
+router.patch("/:id", authMiddleware, jobController.update.bind(jobController));
 
-router.delete("/:id", jobController.delete.bind(jobController));
+router.delete("/:id", authMiddleware, jobController.delete.bind(jobController));
 
 /*
  * search-queries extention
@@ -25,6 +25,7 @@ router.delete("/:id", jobController.delete.bind(jobController));
 
 router.post(
     "/:jobId/search-queries",
+    authMiddleware,
     candidateSearchQueryController.generate.bind(
         candidateSearchQueryController,
     ),
