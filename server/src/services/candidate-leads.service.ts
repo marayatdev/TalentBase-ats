@@ -102,32 +102,32 @@ export class CandidateLeadService {
 
       OR: query.search
         ? [
-            {
-              detected_name: {
-                contains: query.search,
-              },
+          {
+            detected_name: {
+              contains: query.search,
             },
-            {
-              detected_email: {
-                contains: query.search,
-              },
+          },
+          {
+            detected_email: {
+              contains: query.search,
             },
-            {
-              detected_phone: {
-                contains: query.search,
-              },
+          },
+          {
+            detected_phone: {
+              contains: query.search,
             },
-            {
-              detected_position: {
-                contains: query.search,
-              },
+          },
+          {
+            detected_position: {
+              contains: query.search,
             },
-            {
-              raw_text: {
-                contains: query.search,
-              },
+          },
+          {
+            raw_text: {
+              contains: query.search,
             },
-          ]
+          },
+        ]
         : undefined,
     };
 
@@ -445,8 +445,8 @@ export class CandidateLeadService {
 
     const rawSkills = Array.isArray(lead.skills)
       ? lead.skills.filter(
-          (value): value is string => typeof value === "string",
-        )
+        (value): value is string => typeof value === "string",
+      )
       : [];
 
     const skills = this.uniqueStrings(rawSkills);
@@ -581,8 +581,8 @@ export class CandidateLeadService {
         };
       },
       {
-        maxWait: 5_000,
-        timeout: 15_000,
+        maxWait: 10000,
+        timeout: 30000,
       },
     );
   }
@@ -644,18 +644,18 @@ export class CandidateLeadService {
         OR: [
           ...(email
             ? [
-                {
-                  email,
-                },
-              ]
+              {
+                email,
+              },
+            ]
             : []),
 
           ...(phone
             ? [
-                {
-                  phone,
-                },
-              ]
+              {
+                phone,
+              },
+            ]
             : []),
         ],
       },
