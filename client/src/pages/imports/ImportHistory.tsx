@@ -74,6 +74,7 @@ export default function ImportHistoryPage() {
     data,
     isLoading,
     isError,
+    error,
     refetch,
   } = useImportHistory({
     page,

@@ -1,5 +1,10 @@
 import { api } from "./axios";
-import type { ApiSuccess, ListParams } from "@/types/api";
+
+import type {
+  ApiSuccess,
+  ListParams,
+} from "@/types/api";
+
 import type {
   Candidate,
   CandidateSource,
@@ -10,8 +15,6 @@ import type {
   ParseStatus,
   WorkExperience,
 } from "@/types/domain";
-import { withMockFallback } from "./fallback";
-import { mockApi } from "@/mocks/mockApi";
 
 export type CandidatePayload = Omit<
   Candidate,
@@ -26,30 +29,58 @@ export type CandidatePayload = Omit<
   | "education"
   | "languages"
   | "certificates"
+  | "resumes"
 >;
 
 interface BackendCandidateResume {
   id: string;
   candidate_id: string;
+
   original_file_name: string;
   file_url: string;
+
   mime_type: string | null;
-  file_size: string | number | null;
+
+  file_size:
+  | string
+  | number
+  | null;
+
   is_primary: boolean;
+
   parse_status: ParseStatus;
+
   uploaded_at: string;
 }
 
 interface BackendCandidate {
   id: string;
+
   full_name: string;
+
   email: string | null;
+
   phone: string | null;
-  linkedin_url: string | null;
-  current_position: string | null;
-  total_experience_years: string | number | null;
+
+  linkedin_url:
+  | string
+  | null;
+
+  current_position:
+  | string
+  | null;
+
+  total_experience_years:
+  | string
+  | number
+  | null;
+
   source: CandidateSource;
-  source_url: string | null;
+
+  source_url:
+  | string
+  | null;
+
   created_at: string;
   updated_at: string;
 
@@ -58,12 +89,18 @@ interface BackendCandidate {
       id: string;
       name: string;
     };
-    proficiency?: string | null;
+
+    proficiency?:
+    | string
+    | null;
   }>;
 
   candidate_experiences?: WorkExperience[];
+
   candidate_educations?: Education[];
+
   candidate_languages?: Language[];
+
   candidate_certificates?: Certificate[];
 
   resumes?: BackendCandidateResume[];
@@ -71,225 +108,381 @@ interface BackendCandidate {
 
 export interface CreateCandidateWithResumePayload {
   full_name: string;
+
   email?: string;
+
   phone?: string;
+
   linkedin_url?: string;
+
   current_position?: string;
+
   total_experience_years?: number;
+
   source?: CandidateSource;
+
   source_url?: string;
+
   job_id?: string;
+
   resume?: File;
 }
+
 export interface CandidatesListResponse {
   candidates: Candidate[];
 
   pagination: {
     page: number;
+
     limit: number;
+
     total: number;
+
     totalPages: number;
+
     hasNextPage: boolean;
+
     hasPreviousPage: boolean;
   };
 }
 
 interface BackendCandidatesListResponse {
   candidates: BackendCandidate[];
-  pagination: CandidatesListResponse["pagination"];
+
+  pagination:
+  CandidatesListResponse["pagination"];
 }
 
-function mapBackendCandidate(candidate: BackendCandidate): Candidate {
+function mapBackendCandidate(
+  candidate: BackendCandidate,
+): Candidate {
   return {
-    id: String(candidate.id),
-    full_name: candidate.full_name,
-    email: candidate.email,
-    phone: candidate.phone,
-    linkedin_url: candidate.linkedin_url,
-    current_position: candidate.current_position,
+    id:
+      String(
+        candidate.id,
+      ),
+
+    full_name:
+      candidate.full_name,
+
+    email:
+      candidate.email,
+
+    phone:
+      candidate.phone,
+
+    linkedin_url:
+      candidate.linkedin_url,
+
+    current_position:
+      candidate.current_position,
 
     total_experience_years:
-      candidate.total_experience_years === null
+      candidate.total_experience_years ===
+        null
         ? null
-        : Number(candidate.total_experience_years),
+        : Number(
+          candidate.total_experience_years,
+        ),
 
-    source: candidate.source,
-    source_url: candidate.source_url,
+    source:
+      candidate.source,
+
+    source_url:
+      candidate.source_url,
 
     skills:
-      candidate.candidate_skills?.map((item) => ({
-        id: String(item.skills.id),
-        name: item.skills.name,
-        level: item.proficiency ?? null,
-      })) ?? [],
+      candidate.candidate_skills?.map(
+        (item) => ({
+          id:
+            String(
+              item.skills.id,
+            ),
 
-    work_experiences: candidate.candidate_experiences ?? [],
+          name:
+            item.skills.name,
 
-    education: candidate.candidate_educations ?? [],
+          level:
+            item.proficiency ??
+            null,
+        }),
+      ) ?? [],
 
-    languages: candidate.candidate_languages ?? [],
+    work_experiences:
+      candidate.candidate_experiences ??
+      [],
 
-    certificates: candidate.candidate_certificates ?? [],
+    education:
+      candidate.candidate_educations ??
+      [],
+
+    languages:
+      candidate.candidate_languages ??
+      [],
+
+    certificates:
+      candidate.candidate_certificates ??
+      [],
 
     resumes:
-      candidate.resumes?.map((resume) => ({
-        id: String(resume.id),
-        candidate_id: String(resume.candidate_id),
-        original_file_name: resume.original_file_name,
-        file_url: resume.file_url,
+      candidate.resumes?.map(
+        (resume) => ({
+          id:
+            String(
+              resume.id,
+            ),
 
-        file_size: resume.file_size === null ? null : Number(resume.file_size),
+          candidate_id:
+            String(
+              resume.candidate_id,
+            ),
 
-        mime_type: resume.mime_type,
-        parse_status: resume.parse_status,
-        uploaded_at: resume.uploaded_at,
-      })) ?? [],
+          original_file_name:
+            resume.original_file_name,
 
-    resume_count: candidate.resumes?.length ?? 0,
+          file_url:
+            resume.file_url,
 
-    created_at: candidate.created_at,
-    updated_at: candidate.updated_at,
+          file_size:
+            resume.file_size ===
+              null
+              ? null
+              : Number(
+                resume.file_size,
+              ),
+
+          mime_type:
+            resume.mime_type,
+
+          parse_status:
+            resume.parse_status,
+
+          uploaded_at:
+            resume.uploaded_at,
+        }),
+      ) ?? [],
+
+    resume_count:
+      candidate.resumes?.length ??
+      0,
+
+    created_at:
+      candidate.created_at,
+
+    updated_at:
+      candidate.updated_at,
   };
 }
 
 export const candidatesApi = {
-  list: (
+  list: async (
     params: ListParams & {
       source?: string;
     } = {},
-  ) =>
-    withMockFallback(
-      async (): Promise<CandidatesListResponse> => {
-        const requestParams = {
-          page: params.page,
-          limit: params.page_size,
-          search: params.search,
-          source: params.source,
-        };
+  ): Promise<CandidatesListResponse> => {
+    const requestParams = {
+      page:
+        params.page,
 
-        const { data } = await api.get<
-          ApiSuccess<BackendCandidatesListResponse>
-        >("/candidates", {
-          params: requestParams,
-        });
+      limit:
+        params.page_size,
 
-        return {
-          candidates: data.data.candidates.map(mapBackendCandidate),
-          pagination: data.data.pagination,
-        };
+      search:
+        params.search,
+
+      source:
+        params.source,
+    };
+
+    const {
+      data,
+    } = await api.get<
+      ApiSuccess<BackendCandidatesListResponse>
+    >(
+      "/candidates",
+      {
+        params:
+          requestParams,
       },
+    );
 
-      async (): Promise<CandidatesListResponse> => {
-        const mockResult = await mockApi.candidates.list(
-          Number(params.page) || 1,
-          Number(params.page_size) || 10,
-          params.search ?? "",
-          params.source,
-        );
+    return {
+      candidates:
+        data.data.candidates.map(
+          mapBackendCandidate,
+        ),
 
-        return {
-          candidates: mockResult.items,
-          pagination: {
-            page: mockResult.page,
-            limit: mockResult.page_size,
-            total: mockResult.total,
-            totalPages: Math.ceil(mockResult.total / mockResult.page_size),
-            hasNextPage:
-              mockResult.page * mockResult.page_size < mockResult.total,
-            hasPreviousPage: mockResult.page > 1,
-          },
-        };
-      },
-    ),
+      pagination:
+        data.data.pagination,
+    };
+  },
 
-  get: (id: string) =>
-    withMockFallback(
-      async (): Promise<Candidate> => {
-        const { data } = await api.get<ApiSuccess<BackendCandidate>>(
-          `/candidates/${id}`,
-        );
+  get: async (
+    id: string,
+  ): Promise<Candidate> => {
+    const {
+      data,
+    } = await api.get<
+      ApiSuccess<BackendCandidate>
+    >(
+      `/candidates/${id}`,
+    );
 
-        return mapBackendCandidate(data.data);
-      },
+    return mapBackendCandidate(
+      data.data,
+    );
+  },
 
-      () => mockApi.candidates.get(id),
-    ),
-
-  create: async (payload: CandidatePayload): Promise<Candidate> => {
-    const { data } = await api.post<ApiSuccess<BackendCandidate>>(
+  create: async (
+    payload: CandidatePayload,
+  ): Promise<Candidate> => {
+    const {
+      data,
+    } = await api.post<
+      ApiSuccess<BackendCandidate>
+    >(
       "/candidates",
       payload,
     );
 
-    return mapBackendCandidate(data.data);
+    return mapBackendCandidate(
+      data.data,
+    );
   },
 
   update: async (
     id: string,
-    payload: Partial<CandidatePayload>,
+    payload:
+      Partial<CandidatePayload>,
   ): Promise<Candidate> => {
-    const { data } = await api.patch<ApiSuccess<BackendCandidate>>(
+    const {
+      data,
+    } = await api.patch<
+      ApiSuccess<BackendCandidate>
+    >(
       `/candidates/${id}`,
       payload,
     );
 
-    return mapBackendCandidate(data.data);
+    return mapBackendCandidate(
+      data.data,
+    );
   },
 
-  remove: async (id: string): Promise<void> => {
-    await api.delete(`/candidates/${id}`);
+  remove: async (
+    id: string,
+  ): Promise<void> => {
+    await api.delete(
+      `/candidates/${id}`,
+    );
   },
 
-  createWithResume: async (
-    payload: CreateCandidateWithResumePayload,
-  ): Promise<CreateCandidateWithResumeResult> => {
-    const formData = new FormData();
+  createWithResume:
+    async (
+      payload:
+        CreateCandidateWithResumePayload,
+    ): Promise<CreateCandidateWithResumeResult> => {
+      const formData =
+        new FormData();
 
-    formData.append("full_name", payload.full_name);
-
-    if (payload.email) {
-      formData.append("email", payload.email);
-    }
-
-    if (payload.phone) {
-      formData.append("phone", payload.phone);
-    }
-
-    if (payload.linkedin_url) {
-      formData.append("linkedin_url", payload.linkedin_url);
-    }
-
-    if (payload.current_position) {
-      formData.append("current_position", payload.current_position);
-    }
-
-    if (payload.total_experience_years !== undefined) {
       formData.append(
-        "total_experience_years",
-        String(payload.total_experience_years),
+        "full_name",
+        payload.full_name,
       );
-    }
 
-    if (payload.source) {
-      formData.append("source", payload.source);
-    }
+      if (
+        payload.email
+      ) {
+        formData.append(
+          "email",
+          payload.email,
+        );
+      }
 
-    if (payload.source_url) {
-      formData.append("source_url", payload.source_url);
-    }
+      if (
+        payload.phone
+      ) {
+        formData.append(
+          "phone",
+          payload.phone,
+        );
+      }
 
-    if (payload.job_id) {
-      formData.append("job_id", payload.job_id);
-    }
+      if (
+        payload.linkedin_url
+      ) {
+        formData.append(
+          "linkedin_url",
+          payload.linkedin_url,
+        );
+      }
 
-    if (payload.resume) {
-      formData.append("resume", payload.resume);
-    }
+      if (
+        payload.current_position
+      ) {
+        formData.append(
+          "current_position",
+          payload.current_position,
+        );
+      }
 
-    const { data } = await api.post<
-      ApiSuccess<CreateCandidateWithResumeResult>
-    >("/candidates/with-resume", formData);
+      if (
+        payload.total_experience_years !==
+        undefined
+      ) {
+        formData.append(
+          "total_experience_years",
+          String(
+            payload.total_experience_years,
+          ),
+        );
+      }
 
-    return data.data;
-  },
+      if (
+        payload.source
+      ) {
+        formData.append(
+          "source",
+          payload.source,
+        );
+      }
+
+      if (
+        payload.source_url
+      ) {
+        formData.append(
+          "source_url",
+          payload.source_url,
+        );
+      }
+
+      if (
+        payload.job_id
+      ) {
+        formData.append(
+          "job_id",
+          payload.job_id,
+        );
+      }
+
+      if (
+        payload.resume
+      ) {
+        formData.append(
+          "resume",
+          payload.resume,
+        );
+      }
+
+      const {
+        data,
+      } = await api.post<
+        ApiSuccess<CreateCandidateWithResumeResult>
+      >(
+        "/candidates/with-resume",
+        formData,
+      );
+
+      return data.data;
+    },
 };

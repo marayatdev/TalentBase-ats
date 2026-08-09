@@ -3,7 +3,7 @@ import type { ApiError } from "@/types/api";
 
 
 const apiOrigin =
-  import.meta.env.VITE_API_BASE_URL ?? "https://talentbase-ats-production.up.railway.app";
+  import.meta.env.VITE_API_BASE_URL ?? "https://talentbase-ats-production.up.railway.app/api";
 export const api = axios.create({
   baseURL: `${apiOrigin}`,
   withCredentials: true,
