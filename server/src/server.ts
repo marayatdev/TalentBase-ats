@@ -3,7 +3,19 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-const PORT = process.env.PORT || 3000;
+const port = Number(process.env.PORT) || 8000;
 
-const app = new App();
-app.listen(Number(PORT));
+async function bootstrap(): Promise<void> {
+    const app = new App();
+
+    await app.listen(port);
+}
+
+bootstrap().catch((error) => {
+    console.error(
+        "❌ Failed to start application:",
+        error,
+    );
+
+    process.exit(1);
+});

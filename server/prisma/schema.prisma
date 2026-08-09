@@ -4,13 +4,13 @@ generator client {
 }
 
 datasource db {
-  provider = "mysql"
+  provider = "postgresql"
 }
 
 model ai_resume_results {
-  id             BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
-  resume_id      BigInt    @unique(map: "uk_ai_resume_result_resume") @db.UnsignedBigInt
-  extracted_text String?   @db.LongText
+  id             BigInt    @id @default(autoincrement())
+  resume_id      BigInt    @unique(map: "uk_ai_resume_result_resume")
+  extracted_text String?   @db.Text
   summary        String?   @db.Text
   parsed_data    Json?
   model_name     String?   @db.VarChar(100)
@@ -21,11 +21,11 @@ model ai_resume_results {
 }
 
 model application_stage_histories {
-  id                                                                         BigInt           @id @default(autoincrement()) @db.UnsignedBigInt
-  application_id                                                             BigInt           @db.UnsignedBigInt
-  from_stage_id                                                              BigInt?          @db.UnsignedBigInt
-  to_stage_id                                                                BigInt           @db.UnsignedBigInt
-  changed_by                                                                 BigInt?          @db.UnsignedBigInt
+  id                                                                         BigInt           @id @default(autoincrement())
+  application_id                                                             BigInt
+  from_stage_id                                                              BigInt?
+  to_stage_id                                                                BigInt
+  changed_by                                                                 BigInt?
   note                                                                       String?          @db.Text
   changed_at                                                                 DateTime         @default(now()) @db.Timestamp(0)
   applications                                                               applications     @relation(fields: [application_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_stage_history_application")
@@ -33,19 +33,19 @@ model application_stage_histories {
   pipeline_stages_application_stage_histories_to_stage_idTopipeline_stages   pipeline_stages  @relation("application_stage_histories_to_stage_idTopipeline_stages", fields: [to_stage_id], references: [id], onUpdate: NoAction, map: "fk_stage_history_to_stage")
   users                                                                      users?           @relation(fields: [changed_by], references: [id], onUpdate: NoAction, map: "fk_stage_history_user")
 
-  @@index([from_stage_id], map: "fk_stage_history_from_stage")
-  @@index([to_stage_id], map: "fk_stage_history_to_stage")
-  @@index([changed_by], map: "fk_stage_history_user")
+  @@index([from_stage_id], map: "idx_stage_history_from_stage")
+  @@index([to_stage_id], map: "idx_stage_history_to_stage")
+  @@index([changed_by], map: "idx_stage_history_user")
   @@index([application_id], map: "idx_stage_history_application")
 }
 
 model applications {
-  id                          BigInt                        @id @default(autoincrement()) @db.UnsignedBigInt
-  candidate_id                BigInt                        @db.UnsignedBigInt
-  job_id                      BigInt                        @db.UnsignedBigInt
-  resume_id                   BigInt?                       @db.UnsignedBigInt
-  current_stage_id            BigInt?                       @db.UnsignedBigInt
-  assigned_hr_id              BigInt?                       @db.UnsignedBigInt
+  id                          BigInt                        @id @default(autoincrement())
+  candidate_id                BigInt
+  job_id                      BigInt
+  resume_id                   BigInt?
+  current_stage_id            BigInt?
+  assigned_hr_id              BigInt?
   ai_match_score              Decimal?                      @db.Decimal(5, 2)
   ai_match_summary            String?                       @db.Text
   status                      applications_status           @default(active)
@@ -62,27 +62,27 @@ model applications {
   interviews                  interviews[]
 
   @@unique([candidate_id, job_id], map: "uk_candidate_job")
-  @@index([assigned_hr_id], map: "fk_applications_hr")
-  @@index([resume_id], map: "fk_applications_resume")
+  @@index([assigned_hr_id], map: "idx_applications_hr")
+  @@index([resume_id], map: "idx_applications_resume")
   @@index([job_id], map: "idx_applications_job")
   @@index([current_stage_id], map: "idx_applications_stage")
   @@index([status], map: "idx_applications_status")
 }
 
 model candidate_skills {
-  candidate_id     BigInt                        @db.UnsignedBigInt
-  skill_id         BigInt                        @db.UnsignedBigInt
+  candidate_id     BigInt
+  skill_id         BigInt
   experience_years Decimal?                      @db.Decimal(4, 1)
   proficiency      candidate_skills_proficiency?
   candidates       candidates                    @relation(fields: [candidate_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_candidate_skills_candidate")
   skills           skills                        @relation(fields: [skill_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_candidate_skills_skill")
 
   @@id([candidate_id, skill_id])
-  @@index([skill_id], map: "fk_candidate_skills_skill")
+  @@index([skill_id], map: "idx_candidate_skills_skill")
 }
 
 model candidates {
-  id                     BigInt                   @id @default(autoincrement()) @db.UnsignedBigInt
+  id                     BigInt                   @id @default(autoincrement())
   full_name              String                   @db.VarChar(150)
   email                  String?                  @db.VarChar(255)
   phone                  String?                  @db.VarChar(30)
@@ -109,19 +109,19 @@ model candidates {
 }
 
 model job_skills {
-  job_id      BigInt  @db.UnsignedBigInt
-  skill_id    BigInt  @db.UnsignedBigInt
+  job_id      BigInt
+  skill_id    BigInt
   is_required Boolean @default(true)
   weight      Decimal @default(1.00) @db.Decimal(5, 2)
   jobs        jobs    @relation(fields: [job_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_job_skills_job")
   skills      skills  @relation(fields: [skill_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_job_skills_skill")
 
   @@id([job_id, skill_id])
-  @@index([skill_id], map: "fk_job_skills_skill")
+  @@index([skill_id], map: "idx_job_skills_skill")
 }
 
 model jobs {
-  id                       BigInt               @id @default(autoincrement()) @db.UnsignedBigInt
+  id                       BigInt               @id @default(autoincrement())
   title                    String               @db.VarChar(150)
   description              String?              @db.Text
   requirements             String?              @db.Text
@@ -129,9 +129,9 @@ model jobs {
   minimum_experience_years Decimal              @default(0.0) @db.Decimal(4, 1)
   salary_min               Decimal?             @db.Decimal(12, 2)
   salary_max               Decimal?             @db.Decimal(12, 2)
-  number_of_positions      Int                  @default(1) @db.UnsignedInt
+  number_of_positions      Int                  @default(1)
   status                   jobs_status          @default(open)
-  created_by               BigInt?              @db.UnsignedBigInt
+  created_by               BigInt?
   created_at               DateTime             @default(now()) @db.Timestamp(0)
   updated_at               DateTime             @default(now()) @db.Timestamp(0)
   applications             applications[]
@@ -141,14 +141,14 @@ model jobs {
   users                    users?               @relation(fields: [created_by], references: [id], onUpdate: NoAction, map: "fk_jobs_created_by")
   pipeline_stages          pipeline_stages[]
 
-  @@index([created_by], map: "fk_jobs_created_by")
+  @@index([created_by], map: "idx_jobs_created_by")
 }
 
 model pipeline_stages {
-  id                                                                                     BigInt                        @id @default(autoincrement()) @db.UnsignedBigInt
-  job_id                                                                                 BigInt                        @db.UnsignedBigInt
+  id                                                                                     BigInt                        @id @default(autoincrement())
+  job_id                                                                                 BigInt
   name                                                                                   String                        @db.VarChar(100)
-  stage_order                                                                            Int                           @db.UnsignedInt
+  stage_order                                                                            Int
   stage_type                                                                             pipeline_stages_stage_type    @default(active)
   created_at                                                                             DateTime                      @default(now()) @db.Timestamp(0)
   application_stage_histories_application_stage_histories_from_stage_idTopipeline_stages application_stage_histories[] @relation("application_stage_histories_from_stage_idTopipeline_stages")
@@ -161,12 +161,12 @@ model pipeline_stages {
 }
 
 model resumes {
-  id                 BigInt               @id @default(autoincrement()) @db.UnsignedBigInt
-  candidate_id       BigInt               @db.UnsignedBigInt
+  id                 BigInt               @id @default(autoincrement())
+  candidate_id       BigInt
   original_file_name String               @db.VarChar(255)
   file_url           String               @db.VarChar(1000)
   mime_type          String?              @db.VarChar(100)
-  file_size          BigInt?              @db.UnsignedBigInt
+  file_size          BigInt?
   is_primary         Boolean              @default(false)
   parse_status       resumes_parse_status @default(pending)
   uploaded_at        DateTime             @default(now()) @db.Timestamp(0)
@@ -178,7 +178,7 @@ model resumes {
 }
 
 model skills {
-  id               BigInt             @id @default(autoincrement()) @db.UnsignedBigInt
+  id               BigInt             @id @default(autoincrement())
   name             String             @unique(map: "name") @db.VarChar(100)
   created_at       DateTime           @default(now()) @db.Timestamp(0)
   candidate_skills candidate_skills[]
@@ -186,7 +186,7 @@ model skills {
 }
 
 model users {
-  id                          BigInt                        @id @default(autoincrement()) @db.UnsignedBigInt
+  id                          BigInt                        @id @default(autoincrement())
   name                        String                        @db.VarChar(150)
   email                       String                        @unique(map: "email") @db.VarChar(255)
   password                    String                        @db.VarChar(255)
@@ -204,8 +204,8 @@ model users {
 }
 
 model candidate_certificates {
-  id                   BigInt     @id @default(autoincrement()) @db.UnsignedBigInt
-  candidate_id         BigInt     @db.UnsignedBigInt
+  id                   BigInt     @id @default(autoincrement())
+  candidate_id         BigInt
   name                 String     @db.VarChar(255)
   issuing_organization String?    @db.VarChar(255)
   issue_date           String?    @db.VarChar(7)
@@ -222,13 +222,13 @@ model candidate_certificates {
 }
 
 model candidate_educations {
-  id             BigInt     @id @default(autoincrement()) @db.UnsignedBigInt
-  candidate_id   BigInt     @db.UnsignedBigInt
+  id             BigInt     @id @default(autoincrement())
+  candidate_id   BigInt
   institution    String     @db.VarChar(255)
   degree         String?    @db.VarChar(255)
   field_of_study String?    @db.VarChar(255)
-  start_year     Int?       @db.Year
-  end_year       Int?       @db.Year
+  start_year     Int?
+  end_year       Int?
   created_at     DateTime   @default(now()) @db.Timestamp(0)
   updated_at     DateTime   @default(now()) @db.Timestamp(0)
   candidates     candidates @relation(fields: [candidate_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_candidate_educations_candidate")
@@ -239,8 +239,8 @@ model candidate_educations {
 }
 
 model candidate_experiences {
-  id           BigInt     @id @default(autoincrement()) @db.UnsignedBigInt
-  candidate_id BigInt     @db.UnsignedBigInt
+  id           BigInt     @id @default(autoincrement())
+  candidate_id BigInt
   company      String     @db.VarChar(255)
   position     String     @db.VarChar(255)
   start_date   String?    @db.VarChar(7)
@@ -257,8 +257,8 @@ model candidate_experiences {
 }
 
 model candidate_languages {
-  id           BigInt     @id @default(autoincrement()) @db.UnsignedBigInt
-  candidate_id BigInt     @db.UnsignedBigInt
+  id           BigInt     @id @default(autoincrement())
+  candidate_id BigInt
   language     String     @db.VarChar(100)
   level        String?    @db.VarChar(100)
   created_at   DateTime   @default(now()) @db.Timestamp(0)
@@ -271,14 +271,14 @@ model candidate_languages {
 }
 
 model candidate_imports {
-  id             BigInt                          @id @default(autoincrement()) @db.UnsignedBigInt
-  candidate_id   BigInt?                         @db.UnsignedBigInt
-  application_id BigInt?                         @db.UnsignedBigInt
-  job_id         BigInt?                         @db.UnsignedBigInt
-  imported_by    BigInt?                         @db.UnsignedBigInt
+  id             BigInt                          @id @default(autoincrement())
+  candidate_id   BigInt?
+  application_id BigInt?
+  job_id         BigInt?
+  imported_by    BigInt?
   source         candidate_imports_source        @default(manual)
   source_url     String?                         @db.VarChar(1000)
-  raw_text       String?                         @db.LongText
+  raw_text       String?                         @db.Text
   raw_data       Json?
   import_status  candidate_imports_import_status @default(pending)
   error_message  String?                         @db.Text
@@ -289,7 +289,7 @@ model candidate_imports {
   jobs           jobs?                           @relation(fields: [job_id], references: [id], onUpdate: NoAction, map: "fk_candidate_imports_job")
   users          users?                          @relation(fields: [imported_by], references: [id], onUpdate: NoAction, map: "fk_candidate_imports_user")
 
-  @@index([imported_by], map: "fk_candidate_imports_user")
+  @@index([imported_by], map: "idx_candidate_imports_user")
   @@index([application_id], map: "idx_candidate_imports_application_id")
   @@index([candidate_id], map: "idx_candidate_imports_candidate_id")
   @@index([created_at], map: "idx_candidate_imports_created_at")
@@ -299,10 +299,10 @@ model candidate_imports {
 }
 
 model candidate_leads {
-  id                       BigInt                 @id @default(autoincrement()) @db.UnsignedBigInt
+  id                       BigInt                 @id @default(autoincrement())
   source                   candidate_leads_source
   source_url               String?                @db.VarChar(1000)
-  raw_text                 String                 @db.LongText
+  raw_text                 String                 @db.Text
   detected_name            String?                @db.VarChar(150)
   detected_email           String?                @db.VarChar(255)
   detected_phone           String?                @db.VarChar(30)
@@ -310,12 +310,12 @@ model candidate_leads {
   skills                   Json?
   ai_confidence            Decimal?               @db.Decimal(5, 2)
   ai_reason                String?                @db.Text
-  target_job_id            BigInt?                @db.UnsignedBigInt
+  target_job_id            BigInt?
   status                   candidate_leads_status @default(new)
-  reviewed_by              BigInt?                @db.UnsignedBigInt
+  reviewed_by              BigInt?
   reviewed_at              DateTime?              @db.Timestamp(0)
-  converted_candidate_id   BigInt?                @db.UnsignedBigInt
-  converted_application_id BigInt?                @db.UnsignedBigInt
+  converted_candidate_id   BigInt?
+  converted_application_id BigInt?
   created_at               DateTime               @default(now()) @db.Timestamp(0)
   updated_at               DateTime               @default(now()) @db.Timestamp(0)
   applications             applications?          @relation(fields: [converted_application_id], references: [id], onUpdate: NoAction, map: "fk_candidate_leads_application")
@@ -323,19 +323,19 @@ model candidate_leads {
   jobs                     jobs?                  @relation(fields: [target_job_id], references: [id], onUpdate: NoAction, map: "fk_candidate_leads_job")
   users                    users?                 @relation(fields: [reviewed_by], references: [id], onUpdate: NoAction, map: "fk_candidate_leads_reviewer")
 
-  @@index([converted_application_id], map: "fk_candidate_leads_application")
-  @@index([converted_candidate_id], map: "fk_candidate_leads_candidate")
-  @@index([target_job_id], map: "fk_candidate_leads_job")
-  @@index([reviewed_by], map: "fk_candidate_leads_reviewer")
+  @@index([converted_application_id], map: "idx_candidate_leads_application")
+  @@index([converted_candidate_id], map: "idx_candidate_leads_candidate")
+  @@index([target_job_id], map: "idx_candidate_leads_job")
+  @@index([reviewed_by], map: "idx_candidate_leads_reviewer")
 }
 
 model google_accounts {
-  id            BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
-  user_id       BigInt    @unique(map: "user_id") @db.UnsignedBigInt
+  id            BigInt    @id @default(autoincrement())
+  user_id       BigInt    @unique(map: "user_id")
   google_email  String    @db.VarChar(255)
   access_token  String?   @db.Text
   refresh_token String    @db.Text
-  token_expiry  DateTime? @db.DateTime(0)
+  token_expiry  DateTime? @db.Timestamp(0)
   scope         String?   @db.Text
   created_at    DateTime  @default(now()) @db.Timestamp(0)
   updated_at    DateTime  @default(now()) @updatedAt @db.Timestamp(0)
@@ -345,13 +345,13 @@ model google_accounts {
 }
 
 model interviews {
-  id                 BigInt            @id @default(autoincrement()) @db.UnsignedBigInt
-  application_id     BigInt            @db.UnsignedBigInt
-  scheduled_by       BigInt            @db.UnsignedBigInt
+  id                 BigInt            @id @default(autoincrement())
+  application_id     BigInt
+  scheduled_by       BigInt
   title              String            @db.VarChar(255)
   description        String?           @db.Text
-  start_at           DateTime          @db.DateTime(0)
-  end_at             DateTime          @db.DateTime(0)
+  start_at           DateTime          @db.Timestamp(0)
+  end_at             DateTime          @db.Timestamp(0)
   timezone           String            @default("Asia/Bangkok") @db.VarChar(100)
   status             interviews_status @default(scheduled)
   candidate_email    String            @db.VarChar(255)

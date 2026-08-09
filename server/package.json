@@ -5,7 +5,7 @@
   "license": "MIT",
   "dependencies": {
     "@google/genai": "^2.15.0",
-    "@prisma/adapter-mariadb": "^7.9.1",
+    "@prisma/adapter-pg": "^7.9.1",
     "@prisma/client": "^7.9.1",
     "@types/set-cookie-parser": "^2.4.10",
     "argon2": "^0.43.0",
@@ -25,14 +25,17 @@
     "multer": "^2.2.0",
     "nodemailer": "^7.0.3",
     "pdf-parse": "^2.4.5",
+    "pg": "^8.23.0",
     "tsconfig-paths": "^4.2.0"
   },
-  "scripts": {
+    "scripts": {
     "start": "node -r tsconfig-paths/register dist/server.js",
     "dev": "nodemon --watch src --exec ts-node src/server.ts",
     "build": "rm -rf dist && tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json",
+
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
+    "prisma:migrate:deploy": "prisma migrate deploy",
     "prisma:studio": "prisma studio"
   },
   "devDependencies": {
@@ -48,6 +51,7 @@
     "@types/node": "^22.15.3",
     "@types/nodemailer": "^6.4.17",
     "@types/pdf-parse": "^1.1.5",
+    "@types/pg": "^8.21.0",
     "eslint": "^9.26.0",
     "nodemon": "^3.1.10",
     "prettier": "^3.5.3",

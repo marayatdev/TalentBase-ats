@@ -43,7 +43,13 @@ class App {
             return;
           }
 
-          const allowedOrigins = ["http://localhost:5173"];
+          const allowedOrigins = [
+            "http://localhost:5173",
+            process.env.FRONTEND_URL,
+          ].filter(
+            (origin): origin is string =>
+              Boolean(origin),
+          );
 
           if (
             allowedOrigins.includes(origin) ||
@@ -162,11 +168,20 @@ class App {
     try {
       await connectDB();
 
-      this.app.listen(port, () => {
-        logger.info(`🚀 Server is running on http://localhost:${port}`);
-      });
+      this.app.listen(
+        port,
+        "0.0.0.0",
+        () => {
+          logger.info(
+            `🚀 Server is running on port ${port}`,
+          );
+        },
+      );
     } catch (error) {
-      logger.error("❌ Failed to start server:", error);
+      logger.error(
+        "❌ Failed to start server:",
+        error,
+      );
 
       process.exit(1);
     }
