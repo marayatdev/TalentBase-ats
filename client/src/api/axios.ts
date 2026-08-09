@@ -1,8 +1,9 @@
 import axios, { type AxiosError } from "axios";
 import type { ApiError } from "@/types/api";
 
+
 export const api = axios.create({
-  baseURL: "http://localhost:8000/api",
+  baseURL: "https://talentbase-ats-production.up.railway.app/api",
   withCredentials: true,
   headers: {
     Accept: "application/json",

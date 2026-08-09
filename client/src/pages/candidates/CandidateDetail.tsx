@@ -38,7 +38,7 @@ function getResumeFileUrl(fileUrl: string): string {
   }
 
   const apiOrigin =
-    import.meta.env.VITE_API_ORIGIN ?? "http://localhost:8000";
+    import.meta.env.VITE_API_ORIGIN ?? "https://talentbase-ats-production.up.railway.app";
 
   return `${apiOrigin.replace(/\/$/, "")}/${fileUrl.replace(/^\//, "")}`;
 }
