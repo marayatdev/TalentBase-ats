@@ -2,8 +2,11 @@ import axios, { type AxiosError } from "axios";
 import type { ApiError } from "@/types/api";
 
 
+const apiOrigin =
+  import.meta.env.VITE_API_BASE_URL ?? "https://talentbase-ats-production.up.railway.app/api";
+
 export const api = axios.create({
-  baseURL: "https://talentbase-ats-production.up.railway.app/api",
+  baseURL: `${apiOrigin}`,
   withCredentials: true,
   headers: {
     Accept: "application/json",
