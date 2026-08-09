@@ -88,7 +88,7 @@ function isAcceptedAnalysis(
     analysis.is_job_seeker &&
     analysis.matches_target_position &&
     analysis.confidence >=
-      MIN_AI_CONFIDENCE
+    MIN_AI_CONFIDENCE
   );
 }
 
@@ -123,8 +123,7 @@ function printAIAnalysis(
     isAcceptedAnalysis(analysis);
 
   console.groupCollapsed(
-    `[HR ATS Extension] AI analysis · ${
-      passed ? "MATCH" : "NOT MATCH"
+    `[HR ATS Extension] AI analysis · ${passed ? "MATCH" : "NOT MATCH"
     } · ${analysis.confidence}%`,
   );
 
@@ -270,8 +269,8 @@ async function loadSelectedJob(): Promise<void> {
   selectedJob =
     (
       stored.selectedJob as
-        | ExtensionJob
-        | undefined
+      | ExtensionJob
+      | undefined
     ) ?? null;
 
   if (selectedJob) {
@@ -401,7 +400,7 @@ async function analyzePostWithAI(
     ) {
       throw new Error(
         response?.message ??
-          "AI post analysis failed",
+        "AI post analysis failed",
       );
     }
 
@@ -499,13 +498,6 @@ function selectPostsForAI(
           post.id,
         )
       ) {
-        return false;
-      }
-
-      /*
-       * ต้องมี URL เพื่อบันทึกเป็น source_url
-       */
-      if (!post.url) {
         return false;
       }
 
@@ -730,8 +722,8 @@ chrome.storage.onChanged.addListener(
       (
         changes.selectedJob
           .newValue as
-          | ExtensionJob
-          | undefined
+        | ExtensionJob
+        | undefined
       ) ?? null;
 
     clearAnalysisState();

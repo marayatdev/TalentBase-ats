@@ -1,10 +1,6 @@
-import type {
-  ExtensionJob,
-} from "../types/job";
+import type { ExtensionJob } from "../types/job";
 
-import type {
-  ExtensionMessage,
-} from "../types/messages";
+import type { ExtensionMessage } from "../types/messages";
 
 import type {
   CandidatePostAnalysis,
@@ -15,8 +11,21 @@ import type {
   CreateCandidateLeadPayload,
 } from "../types/candidate-lead";
 
+/*
+ * =========================================================
+ * CONFIG
+ * =========================================================
+ */
+
 const ATS_API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL ??
   "https://talentbase-ats-production.up.railway.app/api";
+
+/*
+ * =========================================================
+ * API TYPES
+ * =========================================================
+ */
 
 interface ApiSuccess<T> {
   success: boolean;
@@ -31,6 +40,47 @@ interface ApiErrorResponse {
   message?: string;
 }
 
+
+interface SearchQueriesResult {
+  job_id: string;
+  job_title: string;
+  queries: string[];
+}
+
+interface ExtensionResponse<T> {
+  success: boolean;
+  data?: T;
+  message?: string;
+}
+
+interface ExtensionUser {
+  id: string;
+  name: string | null;
+  email: string;
+  role?: string;
+}
+
+interface ExtensionLoginResult {
+  accessToken: string;
+  user: ExtensionUser;
+}
+
+interface AuthSession {
+  isAuthenticated: boolean;
+  user: ExtensionUser | null;
+}
+
+interface ExtensionLoginPayload {
+  email: string;
+  password: string;
+}
+
+/*
+ * =========================================================
+ * JOB TYPES
+ * =========================================================
+ */
+
 interface JobsResponse {
   jobs: Array<{
     id: string | number;
@@ -38,6 +88,7 @@ interface JobsResponse {
     title: string;
 
     description?: string | null;
+
     requirements?: string | null;
 
     minimum_experience_years?:
@@ -58,144 +109,31 @@ interface JobsResponse {
   }>;
 }
 
-interface ExtensionResponse<T> {
-  success: boolean;
-  data?: T;
-  message?: string;
-}
+/*
+ * =========================================================
+ * SEARCH QUERY TYPES
+ * =========================================================
+ */
 
-interface ExtensionUser {
-  id: string;
-  name: string | null;
-  email: string;
-  role?: string;
-}
-
-interface ExtensionAuthData {
-  accessToken: string;
-  user: ExtensionUser;
-}
-
-const ACCESS_TOKEN_KEY = "accessToken";
-const EXTENSION_USER_KEY = "extensionUser";
-
-async function getAccessToken(): Promise<string | null> {
-  const stored = await chrome.storage.local.get(ACCESS_TOKEN_KEY);
-  return typeof stored[ACCESS_TOKEN_KEY] === "string"
-    ? stored[ACCESS_TOKEN_KEY]
-    : null;
-}
-
-async function authenticatedFetch(
-  path: string,
-  options: RequestInit = {},
-): Promise<Response> {
-  const accessToken = await getAccessToken();
-
-  if (!accessToken) {
-    throw new Error("Please login to TalentBase ATS first");
-  }
-
-  const headers = new Headers(options.headers);
-  headers.set("Accept", "application/json");
-  headers.set("Authorization", `Bearer ${accessToken}`);
-
-  if (options.body && !(options.body instanceof FormData)) {
-    headers.set("Content-Type", "application/json");
-  }
-
-  const response = await fetch(`${ATS_API_BASE_URL}${path}`, {
-    ...options,
-    headers,
-  });
-
-  if (response.status === 401) {
-    await chrome.storage.local.remove([
-      ACCESS_TOKEN_KEY,
-      EXTENSION_USER_KEY,
-      "selectedJob",
-    ]);
-  }
-
-  return response;
-}
-
-async function login(
-  email: string,
-  password: string,
-): Promise<ExtensionUser> {
-  const response = await fetch(`${ATS_API_BASE_URL}/auth/extension-login`, {
-    method: "POST",
-    headers: {
-      Accept: "application/json",
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ email, password }),
-  });
-
-  if (!response.ok) {
-    throw new Error(
-      await parseErrorMessage(response, `Login failed (${response.status})`),
-    );
-  }
-
-  const body = (await response.json()) as ApiSuccess<ExtensionAuthData>;
-
-  if (!body.data?.accessToken || !body.data.user) {
-    throw new Error("Login response did not contain an access token");
-  }
-
-  await chrome.storage.local.set({
-    [ACCESS_TOKEN_KEY]: body.data.accessToken,
-    [EXTENSION_USER_KEY]: body.data.user,
-  });
-
-  return body.data.user;
-}
-
-async function logout(): Promise<void> {
-  await chrome.storage.local.remove([
-    ACCESS_TOKEN_KEY,
-    EXTENSION_USER_KEY,
-    "selectedJob",
-  ]);
-}
-
-async function getAuthSession(): Promise<{
-  isAuthenticated: boolean;
-  user: ExtensionUser | null;
-}> {
-  const stored = await chrome.storage.local.get([
-    ACCESS_TOKEN_KEY,
-    EXTENSION_USER_KEY,
-  ]);
-
-  return {
-    isAuthenticated:
-      typeof stored[ACCESS_TOKEN_KEY] === "string" &&
-      stored[ACCESS_TOKEN_KEY].length > 0,
-    user:
-      (stored[EXTENSION_USER_KEY] as ExtensionUser | undefined) ?? null,
-  };
-}
+/*
+ * =========================================================
+ * HELPERS
+ * =========================================================
+ */
 
 function normalizeJob(
   job: JobsResponse["jobs"][number],
 ): ExtensionJob {
   return {
-    id:
-      String(job.id),
+    id: String(job.id),
 
-    title:
-      job.title,
+    title: job.title,
 
     description:
-      job.description ??
-      null,
+      job.description ?? null,
 
     requirements:
-      job.requirements ??
-      null,
+      job.requirements ?? null,
 
     minimum_experience_years:
       Number(
@@ -229,7 +167,241 @@ async function parseErrorMessage(
 }
 
 /*
- * โหลด Job ที่เปิดรับสมัครอยู่
+ * =========================================================
+ * EXTENSION AUTH
+ * =========================================================
+ */
+
+const ACCESS_TOKEN_STORAGE_KEY = "extensionAccessToken";
+const AUTH_USER_STORAGE_KEY = "extensionAuthUser";
+
+async function getAccessToken(): Promise<string | null> {
+  const stored = await chrome.storage.local.get(
+    ACCESS_TOKEN_STORAGE_KEY,
+  );
+
+  const value =
+    stored[ACCESS_TOKEN_STORAGE_KEY];
+
+  return typeof value === "string" &&
+    value.trim().length > 0
+    ? value
+    : null;
+}
+
+async function authenticatedFetch(
+  path: string,
+  options: RequestInit = {},
+): Promise<Response> {
+  const accessToken =
+    await getAccessToken();
+
+  if (!accessToken) {
+    throw new Error(
+      "No access token found. Please login again.",
+    );
+  }
+
+  const headers =
+    new Headers(
+      options.headers,
+    );
+
+  headers.set(
+    "Accept",
+    "application/json",
+  );
+
+  headers.set(
+    "Authorization",
+    `Bearer ${accessToken}`,
+  );
+
+  if (
+    options.body &&
+    !(options.body instanceof FormData)
+  ) {
+    headers.set(
+      "Content-Type",
+      "application/json",
+    );
+  }
+
+  const response =
+    await fetch(
+      `${ATS_API_BASE_URL}${path}`,
+      {
+        ...options,
+        headers,
+      },
+    );
+
+  if (
+    response.status ===
+    401
+  ) {
+    await chrome.storage.local.remove([
+      ACCESS_TOKEN_STORAGE_KEY,
+      AUTH_USER_STORAGE_KEY,
+      "selectedJob",
+    ]);
+  }
+
+  return response;
+}
+
+async function extensionLogin(
+  payload: ExtensionLoginPayload,
+): Promise<ExtensionUser> {
+  const email =
+    payload.email?.trim();
+
+  const password =
+    payload.password ?? "";
+
+  if (
+    !email ||
+    !password
+  ) {
+    throw new Error(
+      "Email and password are required",
+    );
+  }
+
+  const response =
+    await fetch(
+      `${ATS_API_BASE_URL}/auth/extension-login`,
+      {
+        method: "POST",
+
+        headers: {
+          Accept:
+            "application/json",
+
+          "Content-Type":
+            "application/json",
+        },
+
+        body:
+          JSON.stringify({
+            email,
+            password,
+          }),
+      },
+    );
+
+  if (
+    !response.ok
+  ) {
+    const message =
+      await parseErrorMessage(
+        response,
+        `Could not login (${response.status})`,
+      );
+
+    throw new Error(
+      message,
+    );
+  }
+
+  const body =
+    (await response.json()) as
+    ApiSuccess<ExtensionLoginResult>;
+
+  if (
+    !body.data?.accessToken ||
+    !body.data?.user
+  ) {
+    throw new Error(
+      "Login response did not contain access token",
+    );
+  }
+
+  await chrome.storage.local.set({
+    [ACCESS_TOKEN_STORAGE_KEY]:
+      body.data.accessToken,
+
+    [AUTH_USER_STORAGE_KEY]:
+      body.data.user,
+  });
+
+  return body.data.user;
+}
+
+async function getAuthSession(): Promise<AuthSession> {
+  const stored =
+    await chrome.storage.local.get([
+      ACCESS_TOKEN_STORAGE_KEY,
+      AUTH_USER_STORAGE_KEY,
+    ]);
+
+  const accessToken =
+    stored[
+    ACCESS_TOKEN_STORAGE_KEY
+    ];
+
+  const user =
+    (stored[
+      AUTH_USER_STORAGE_KEY
+    ] as
+      | ExtensionUser
+      | undefined) ??
+    null;
+
+  return {
+    isAuthenticated:
+      typeof accessToken ===
+      "string" &&
+      accessToken.trim()
+        .length >
+      0 &&
+      user !== null,
+
+    user,
+  };
+}
+
+async function extensionLogout(): Promise<void> {
+  await chrome.storage.local.remove([
+    ACCESS_TOKEN_STORAGE_KEY,
+    AUTH_USER_STORAGE_KEY,
+    "selectedJob",
+  ]);
+
+  try {
+    await fetch(
+      `${ATS_API_BASE_URL}/auth/logout`,
+      {
+        method:
+          "POST",
+
+        credentials:
+          "include",
+
+        headers: {
+          Accept:
+            "application/json",
+        },
+      },
+    );
+  } catch (
+  error
+  ) {
+    console.warn(
+      "[HR ATS Extension] Backend logout request failed",
+      error,
+    );
+  }
+}
+
+/*
+ * =========================================================
+ * JOB API
+ * =========================================================
+ */
+
+/*
+ * โหลด Job ที่ status = open
  */
 async function getOpenJobs(): Promise<
   ExtensionJob[]
@@ -239,11 +411,6 @@ async function getOpenJobs(): Promise<
       "/jobs?page=1&page_size=100&status=open",
       {
         method: "GET",
-
-        headers: {
-          Accept:
-            "application/json",
-        },
       },
     );
 
@@ -254,25 +421,25 @@ async function getOpenJobs(): Promise<
         `Could not load jobs (${response.status})`,
       );
 
-    throw new Error(
-      message,
-    );
+    throw new Error(message);
   }
 
   const body =
-    (await response.json()) as ApiSuccess<JobsResponse>;
+    (await response.json()) as
+    ApiSuccess<JobsResponse>;
 
   return (
-    body.data.jobs ??
+    body.data?.jobs ??
     []
-  ).map(
-    normalizeJob,
-  );
+  ).map(normalizeJob);
 }
 
 /*
- * อ่าน Job ที่ HR เลือก
+ * =========================================================
+ * SELECTED JOB STORAGE
+ * =========================================================
  */
+
 async function getSelectedJob(): Promise<
   ExtensionJob | null
 > {
@@ -288,16 +455,12 @@ async function getSelectedJob(): Promise<
   ) ?? null;
 }
 
-/*
- * Save Job ที่ HR เลือก
- */
 async function setSelectedJob(
   job: ExtensionJob | null,
 ): Promise<void> {
   if (job) {
     await chrome.storage.local.set({
-      selectedJob:
-        job,
+      selectedJob: job,
     });
 
     return;
@@ -309,8 +472,11 @@ async function setSelectedJob(
 }
 
 /*
- * วิเคราะห์ Facebook Post
+ * =========================================================
+ * FACEBOOK AI ANALYSIS
+ * =========================================================
  */
+
 async function analyzeFacebookPost(
   message: Extract<
     ExtensionMessage,
@@ -331,28 +497,31 @@ async function analyzeFacebookPost(
     );
   }
 
-  if (
-    !post?.text?.trim()
-  ) {
+  if (!post?.text?.trim()) {
     throw new Error(
       "Facebook post text is empty",
     );
   }
+
+  console.log(
+    "[HR ATS Extension] Analyzing Facebook post",
+    {
+      postId:
+        post.id,
+
+      jobId:
+        job.id,
+
+      jobTitle:
+        job.title,
+    },
+  );
 
   const response =
     await authenticatedFetch(
       "/candidate-imports/analyze-post",
       {
         method: "POST",
-
-        headers: {
-          Accept:
-            "application/json",
-
-          "Content-Type":
-            "application/json",
-        },
-
         body: JSON.stringify({
           source:
             "facebook",
@@ -365,15 +534,15 @@ async function analyzeFacebookPost(
             post.text,
 
           /*
-           * สำคัญ:
-           * Backend จะใช้ job_id
-           * query Job จริงจาก Database
+           * Backend ใช้ Job ID
+           * เพื่อดึง JD จาก Database
            */
           job_id:
             job.id,
 
           /*
-           * ส่งไว้เพื่อ backward compatibility
+           * ส่งไว้เผื่อ Backend
+           * version เก่ายังใช้อยู่
            */
           target_position:
             job.title,
@@ -382,19 +551,20 @@ async function analyzeFacebookPost(
     );
 
   if (!response.ok) {
-    const message =
+    const errorMessage =
       await parseErrorMessage(
         response,
         `Could not analyze Facebook post (${response.status})`,
       );
 
     throw new Error(
-      message,
+      errorMessage,
     );
   }
 
   const body =
-    (await response.json()) as ApiSuccess<CandidatePostAnalysis>;
+    (await response.json()) as
+    ApiSuccess<CandidatePostAnalysis>;
 
   if (!body.data) {
     throw new Error(
@@ -406,8 +576,11 @@ async function analyzeFacebookPost(
 }
 
 /*
- * Save Candidate Lead เข้า ATS
+ * =========================================================
+ * SAVE CANDIDATE LEAD
+ * =========================================================
  */
+
 async function createCandidateLead(
   payload: CreateCandidateLeadPayload,
 ): Promise<CandidateLead> {
@@ -421,24 +594,9 @@ async function createCandidateLead(
       "/candidate-leads",
       {
         method: "POST",
-
-        /*
-         * ถ้า ATS authentication
-         * ใช้ cookie ต้องมีบรรทัดนี้
-         */
-
-        headers: {
-          Accept:
-            "application/json",
-
-          "Content-Type":
-            "application/json",
-        },
-
-        body:
-          JSON.stringify(
-            payload,
-          ),
+        body: JSON.stringify(
+          payload,
+        ),
       },
     );
 
@@ -489,76 +647,202 @@ async function createCandidateLead(
   return body.data;
 }
 
+/*
+ * =========================================================
+ * GENERATE SEARCH QUERIES
+ * =========================================================
+ */
+
+async function generateSearchQueries(
+  jobId: string,
+): Promise<SearchQueriesResult> {
+  if (!jobId?.trim()) {
+    throw new Error(
+      "Job ID is required",
+    );
+  }
+
+  console.log(
+    "[HR ATS Extension] Generating search queries",
+    {
+      jobId,
+    },
+  );
+
+  const response =
+    await authenticatedFetch(
+      `/jobs/${encodeURIComponent(
+        jobId,
+      )}/search-queries`,
+      {
+        method: "POST",
+      },
+    );
+
+  if (!response.ok) {
+    const message =
+      await parseErrorMessage(
+        response,
+        `Could not generate search queries (${response.status})`,
+      );
+
+    throw new Error(
+      message,
+    );
+  }
+
+  const body =
+    (await response.json()) as
+    ApiSuccess<SearchQueriesResult>;
+
+  if (!body.data) {
+    throw new Error(
+      "Search query result was not returned",
+    );
+  }
+
+  if (
+    !Array.isArray(
+      body.data.queries,
+    )
+  ) {
+    throw new Error(
+      "Invalid search query response",
+    );
+  }
+
+  console.log(
+    "[HR ATS Extension] Search queries generated",
+    {
+      jobId:
+        body.data.job_id,
+
+      jobTitle:
+        body.data.job_title,
+
+      queries:
+        body.data.queries,
+    },
+  );
+
+  return body.data;
+}
+
+/*
+ * =========================================================
+ * MESSAGE LISTENER
+ * =========================================================
+ */
+
 chrome.runtime.onMessage.addListener(
   (
     message: ExtensionMessage,
     _sender,
     sendResponse,
   ) => {
-    const authMessage = message as unknown as {
-      type: string;
-      payload?: {
-        email?: string;
-        password?: string;
+    /*
+     * -----------------------------------------------------
+     * EXTENSION LOGIN
+     * -----------------------------------------------------
+     */
+    if (message.type === "EXTENSION_LOGIN") {
+      const authMessage = message as ExtensionMessage & {
+        payload: ExtensionLoginPayload;
       };
-    };
 
-    if (authMessage.type === "EXTENSION_LOGIN") {
-      const email = authMessage.payload?.email?.trim() ?? "";
-      const password = authMessage.payload?.password ?? "";
+      void extensionLogin(authMessage.payload)
+        .then((user) => {
+          sendResponse({
+            success: true,
+            data: user,
+          });
+        })
+        .catch((error: unknown) => {
+          console.error(
+            "[HR ATS Extension] Login failed",
+            error,
+          );
 
-      if (!email || !password) {
-        sendResponse({
-          success: false,
-          message: "Email and password are required",
+          sendResponse({
+            success: false,
+            message:
+              error instanceof Error
+                ? error.message
+                : "Could not login",
+          });
         });
-        return false;
-      }
-
-      void login(email, password)
-        .then((user) => sendResponse({ success: true, data: user }))
-        .catch((error: unknown) =>
-          sendResponse({
-            success: false,
-            message: error instanceof Error ? error.message : "Could not login",
-          }),
-        );
 
       return true;
     }
 
-    if (authMessage.type === "EXTENSION_LOGOUT") {
-      void logout()
-        .then(() => sendResponse({ success: true, data: null }))
-        .catch((error: unknown) =>
-          sendResponse({
-            success: false,
-            message: error instanceof Error ? error.message : "Could not logout",
-          }),
-        );
-
-      return true;
-    }
-
-    if (authMessage.type === "GET_AUTH_SESSION") {
+    /*
+     * -----------------------------------------------------
+     * GET AUTH SESSION
+     * -----------------------------------------------------
+     */
+    if (message.type === "GET_AUTH_SESSION") {
       void getAuthSession()
-        .then((session) => sendResponse({ success: true, data: session }))
-        .catch((error: unknown) =>
+        .then((session) => {
+          sendResponse({
+            success: true,
+            data: session,
+          });
+        })
+        .catch((error: unknown) => {
+          console.error(
+            "[HR ATS Extension] Could not load auth session",
+            error,
+          );
+
           sendResponse({
             success: false,
             message:
               error instanceof Error
                 ? error.message
                 : "Could not load auth session",
-          }),
-        );
+          });
+        });
 
       return true;
     }
 
     /*
-     * GET OPEN JOBS
+     * -----------------------------------------------------
+     * EXTENSION LOGOUT
+     * -----------------------------------------------------
      */
+    if (message.type === "EXTENSION_LOGOUT") {
+      void extensionLogout()
+        .then(() => {
+          sendResponse({
+            success: true,
+            data: null,
+          });
+        })
+        .catch((error: unknown) => {
+          console.error(
+            "[HR ATS Extension] Logout failed",
+            error,
+          );
+
+          sendResponse({
+            success: false,
+            message:
+              error instanceof Error
+                ? error.message
+                : "Could not logout",
+          });
+        });
+
+      return true;
+    }
+
+    /*
+     * -----------------------------------------------------
+     * GET OPEN JOBS
+     * -----------------------------------------------------
+     */
+
     if (
       message.type ===
       "GET_OPEN_JOBS"
@@ -585,6 +869,11 @@ chrome.runtime.onMessage.addListener(
           (
             error: unknown,
           ) => {
+            console.error(
+              "[HR ATS Extension] Could not load jobs",
+              error,
+            );
+
             sendResponse({
               success:
                 false,
@@ -597,12 +886,19 @@ chrome.runtime.onMessage.addListener(
           },
         );
 
+      /*
+       * สำคัญ:
+       * บอก Chrome ว่าจะตอบ async
+       */
       return true;
     }
 
     /*
+     * -----------------------------------------------------
      * GET SELECTED JOB
+     * -----------------------------------------------------
      */
+
     if (
       message.type ===
       "GET_SELECTED_JOB"
@@ -629,6 +925,11 @@ chrome.runtime.onMessage.addListener(
           (
             error: unknown,
           ) => {
+            console.error(
+              "[HR ATS Extension] Could not load selected job",
+              error,
+            );
+
             sendResponse({
               success:
                 false,
@@ -645,8 +946,11 @@ chrome.runtime.onMessage.addListener(
     }
 
     /*
+     * -----------------------------------------------------
      * SET SELECTED JOB
+     * -----------------------------------------------------
      */
+
     if (
       message.type ===
       "SET_SELECTED_JOB"
@@ -655,7 +959,56 @@ chrome.runtime.onMessage.addListener(
         message.payload.job,
       )
         .then(
-          () => {
+          async () => {
+            /*
+             * แจ้ง Content Script
+             * ว่า Job เปลี่ยนแล้ว
+             */
+            try {
+              const tabs =
+                await chrome.tabs.query({
+                  url: [
+                    "*://*.facebook.com/*",
+                  ],
+                });
+
+              for (
+                const tab
+                of tabs
+              ) {
+                if (!tab.id) {
+                  continue;
+                }
+
+                try {
+                  await chrome.tabs.sendMessage(
+                    tab.id,
+                    {
+                      type:
+                        "SELECTED_JOB_CHANGED",
+
+                      payload: {
+                        job:
+                          message.payload.job,
+                      },
+                    },
+                  );
+                } catch {
+                  /*
+                   * Tab อาจยังไม่มี content script
+                   * ไม่ถือเป็น error
+                   */
+                }
+              }
+            } catch (
+            error
+            ) {
+              console.warn(
+                "[HR ATS Extension] Could not notify Facebook tabs",
+                error,
+              );
+            }
+
             sendResponse({
               success:
                 true,
@@ -669,6 +1022,11 @@ chrome.runtime.onMessage.addListener(
           (
             error: unknown,
           ) => {
+            console.error(
+              "[HR ATS Extension] Could not save selected job",
+              error,
+            );
+
             sendResponse({
               success:
                 false,
@@ -685,8 +1043,11 @@ chrome.runtime.onMessage.addListener(
     }
 
     /*
-     * AI ANALYZE FACEBOOK POST
+     * -----------------------------------------------------
+     * ANALYZE FACEBOOK POST
+     * -----------------------------------------------------
      */
+
     if (
       message.type ===
       "ANALYZE_FACEBOOK_POST"
@@ -730,8 +1091,11 @@ chrome.runtime.onMessage.addListener(
     }
 
     /*
+     * -----------------------------------------------------
      * SAVE CANDIDATE LEAD
+     * -----------------------------------------------------
      */
+
     if (
       message.type ===
       "SAVE_CANDIDATE_LEAD"
@@ -764,11 +1128,6 @@ chrome.runtime.onMessage.addListener(
           (
             error: unknown,
           ) => {
-            const message =
-              error instanceof Error
-                ? error.message
-                : "Could not save candidate lead";
-
             console.error(
               "[HR ATS Extension] Candidate lead API failed",
               error,
@@ -778,22 +1137,158 @@ chrome.runtime.onMessage.addListener(
               success:
                 false,
 
-              message,
+              message:
+                error instanceof Error
+                  ? error.message
+                  : "Could not save candidate lead",
             });
           },
         );
 
       /*
        * สำคัญมาก
-       *
-       * ต้อง return true
-       * เพราะ fetch เป็น async
-       * ไม่อย่างนั้น message channel
-       * จะถูกปิดก่อน sendResponse()
+       * fetch เป็น async
+       */
+      return true;
+    }
+
+    /*
+     * -----------------------------------------------------
+     * GENERATE SEARCH QUERIES
+     * -----------------------------------------------------
+     */
+
+    if (
+      message.type ===
+      "GENERATE_SEARCH_QUERIES"
+    ) {
+      console.log(
+        "[HR ATS Extension] GENERATE_SEARCH_QUERIES received",
+        message.payload,
+      );
+
+      void generateSearchQueries(
+        message.payload.jobId,
+      )
+        .then(
+          (result) => {
+            sendResponse({
+              success:
+                true,
+
+              data:
+                result,
+            });
+          },
+        )
+        .catch(
+          (
+            error: unknown,
+          ) => {
+            console.error(
+              "[HR ATS Extension] Generate search queries failed",
+              error,
+            );
+
+            sendResponse({
+              success:
+                false,
+
+              message:
+                error instanceof Error
+                  ? error.message
+                  : "Could not generate search queries",
+            });
+          },
+        );
+
+      /*
+       * สำคัญ:
+       * ต้อง return true เพราะรอ API
        */
       return true;
     }
 
     return false;
   },
+);
+
+/*
+ * =========================================================
+ * STORAGE CHANGE LISTENER
+ * =========================================================
+ *
+ * กรณี selectedJob ถูกแก้จากที่อื่น
+ * ให้แจ้ง Facebook Content Script ด้วย
+ */
+
+chrome.storage.onChanged.addListener(
+  (
+    changes,
+    areaName,
+  ) => {
+    if (
+      areaName !==
+      "local" ||
+      !changes.selectedJob
+    ) {
+      return;
+    }
+
+    const selectedJob =
+      (changes.selectedJob
+        .newValue as
+        | ExtensionJob
+        | undefined) ??
+      null;
+
+    console.log(
+      "[HR ATS Extension] Selected job changed from storage",
+      selectedJob,
+    );
+
+    void chrome.tabs
+      .query({
+        url: [
+          "*://*.facebook.com/*",
+        ],
+      })
+      .then(
+        async (
+          tabs,
+        ) => {
+          for (
+            const tab
+            of tabs
+          ) {
+            if (!tab.id) {
+              continue;
+            }
+
+            try {
+              await chrome.tabs.sendMessage(
+                tab.id,
+                {
+                  type:
+                    "SELECTED_JOB_CHANGED",
+
+                  payload: {
+                    job:
+                      selectedJob,
+                  },
+                },
+              );
+            } catch {
+              /*
+               * Content script อาจยังไม่ถูก inject
+               */
+            }
+          }
+        },
+      );
+  },
+);
+
+console.log(
+  "[HR ATS Extension] Background service worker loaded",
 );

@@ -41,9 +41,56 @@ export interface SaveCandidateLeadMessage {
   payload: CreateCandidateLeadPayload;
 }
 
+export interface GenerateSearchQueriesMessage {
+  type: "GENERATE_SEARCH_QUERIES";
+
+  payload: {
+    jobId: string;
+  };
+}
+
 export type ExtensionMessage =
-  | GetJobsMessage
-  | GetSelectedJobMessage
-  | SetSelectedJobMessage
-  | AnalyzeFacebookPostMessage
-  | SaveCandidateLeadMessage;
+  | {
+    type: "GET_OPEN_JOBS";
+  }
+  | {
+    type: "GET_SELECTED_JOB";
+  }
+  | {
+    type: "SET_SELECTED_JOB";
+    payload: {
+      job: ExtensionJob | null;
+    };
+  }
+  | {
+    type: "ANALYZE_FACEBOOK_POST";
+    payload: {
+      post: FacebookPost;
+      job: ExtensionJob;
+    };
+  }
+  | {
+    type: "SAVE_CANDIDATE_LEAD";
+    payload: CreateCandidateLeadPayload;
+  }
+  | {
+    type: "GENERATE_SEARCH_QUERIES";
+    payload: {
+      jobId: string;
+    };
+  }
+
+  | {
+    type: "EXTENSION_LOGIN";
+    payload: {
+      email: string;
+      password: string;
+    };
+  }
+  | {
+    type: "GET_AUTH_SESSION";
+  }
+  | {
+    type: "EXTENSION_LOGOUT";
+  };
+
