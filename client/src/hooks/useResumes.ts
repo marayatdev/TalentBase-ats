@@ -1,33 +1,126 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { resumesApi } from "@/api/resumes.api";
-import { useState } from "react";
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 
-export function useResumes(candidateId: string | undefined) {
+import {
+  useState,
+} from "react";
+
+import {
+  resumesApi,
+} from "@/api/resumes.api";
+
+export function useResumes(
+  candidateId:
+    | string
+    | undefined,
+) {
   return useQuery({
-    queryKey: ["resumes", candidateId],
-    queryFn: () => resumesApi.listForCandidate(candidateId as string),
-    enabled: !!candidateId,
+    queryKey: [
+      "resumes",
+      candidateId,
+    ],
+
+    queryFn: () =>
+      resumesApi.listByCandidate(
+        candidateId as string,
+      ),
+
+    enabled:
+      Boolean(candidateId),
   });
 }
 
-export function useUploadResume(candidateId: string) {
-  const qc = useQueryClient();
-  const [progress, setProgress] = useState(0);
-  const mutation = useMutation({
-    mutationFn: (file: File) => resumesApi.upload(candidateId, file, setProgress),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["resumes", candidateId] });
-      qc.invalidateQueries({ queryKey: ["candidates", candidateId] });
-      setProgress(0);
-    },
-  });
-  return { ...mutation, progress };
+export function useUploadResume(
+  candidateId: string,
+) {
+  const qc =
+    useQueryClient();
+
+  const [
+    progress,
+    setProgress,
+  ] = useState(0);
+
+  const mutation =
+    useMutation({
+      mutationFn:
+        async (
+          file: File,
+        ) => {
+          setProgress(0);
+
+          const result =
+            await resumesApi.upload(
+              candidateId,
+              file,
+            );
+
+          setProgress(100);
+
+          return result;
+        },
+
+      onSuccess: () => {
+        void qc.invalidateQueries({
+          queryKey: [
+            "resumes",
+            candidateId,
+          ],
+        });
+
+        void qc.invalidateQueries({
+          queryKey: [
+            "candidates",
+            candidateId,
+          ],
+        });
+
+        setProgress(0);
+      },
+
+      onError: () => {
+        setProgress(0);
+      },
+    });
+
+  return {
+    ...mutation,
+    progress,
+  };
 }
 
-export function useDeleteResume(candidateId: string) {
-  const qc = useQueryClient();
+export function useDeleteResume(
+  candidateId: string,
+) {
+  const qc =
+    useQueryClient();
+
   return useMutation({
-    mutationFn: (id: string) => resumesApi.remove(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["resumes", candidateId] }),
+    mutationFn:
+      (
+        id: string,
+      ) =>
+        resumesApi.remove(
+          id,
+        ),
+
+    onSuccess: () => {
+      void qc.invalidateQueries({
+        queryKey: [
+          "resumes",
+          candidateId,
+        ],
+      });
+
+      void qc.invalidateQueries({
+        queryKey: [
+          "candidates",
+          candidateId,
+        ],
+      });
+    },
   });
 }

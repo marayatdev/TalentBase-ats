@@ -5,7 +5,7 @@ import { ProtectedRoute } from "@/components/layout/ProtectedRoute";
 import LoginPage from "@/pages/auth/Login";
 import RegisterPage from "@/pages/auth/Register";
 import DashboardPage from "@/pages/dashboard/Dashboard";
-import ReportsPage from "@/pages/dashboard/Reports";
+// import ReportsPage from "@/pages/dashboard/Reports";
 
 import JobListPage from "@/pages/jobs/JobList";
 import JobFormPage from "@/pages/jobs/JobForm";
@@ -44,7 +44,7 @@ export default function App() {
           <Route element={<AppLayout />}>
             <Route index element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<DashboardPage />} />
-            <Route path="/reports" element={<ReportsPage />} />
+            {/* <Route path="/reports" element={<ReportsPage />} /> */}
 
             <Route path="/jobs" element={<JobListPage />} />
             <Route path="/jobs/new" element={<JobFormPage />} />

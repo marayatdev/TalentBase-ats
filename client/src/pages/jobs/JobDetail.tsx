@@ -94,7 +94,7 @@ export default function JobDetailPage() {
                     {applications.items.map((a) => (
                       <TableRow key={a.id} className="cursor-pointer" onClick={() => navigate(`/applications/${a.id}`)}>
                         <TableCell className="font-medium text-[var(--color-ink)]">{a.candidate.full_name}</TableCell>
-                        <TableCell className="text-[var(--color-ink)]/70">{a.current_stage.name}</TableCell>
+                        <TableCell className="text-[var(--color-ink)]/70">{a.current_stage?.name ?? "No stage"}</TableCell>
                         <TableCell><ApplicationStatusBadge status={a.status} /></TableCell>
                         <TableCell className="text-[var(--color-ink)]/70">{a.ai_match_score ?? "-"}</TableCell>
                       </TableRow>
