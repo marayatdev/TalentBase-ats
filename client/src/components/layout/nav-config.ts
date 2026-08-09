@@ -27,7 +27,7 @@ export const navItems: NavItem[] = [
   { label: "Applications", to: "/applications", icon: FileText },
   { label: "Pipeline", to: "/pipeline", icon: Kanban },
   // { label: "Candidate Imports", to: "/imports", icon: UploadCloud },
-  { label: "AI Analysis", to: "/ai-analysis", icon: Sparkles },
+  // { label: "AI Analysis", to: "/ai-analysis", icon: Sparkles },
   // { label: "Reports", to: "/reports", icon: BarChart3 },
   { label: "Settings", to: "/settings", icon: Settings },
 ];
