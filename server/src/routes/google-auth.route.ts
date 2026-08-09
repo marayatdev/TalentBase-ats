@@ -8,6 +8,7 @@ const controller = new GoogleAuthController();
 
 router.get(
   "/auth-url",
+  authMiddleware,
   controller.getAuthUrl.bind(controller),
 );
 
@@ -17,16 +18,19 @@ router.get(
  */
 router.get(
   "/oauth/callback",
+  authMiddleware,
   controller.callback.bind(controller),
 );
 
 router.get(
   "/connection",
+  authMiddleware,
   controller.connection.bind(controller),
 );
 
 router.delete(
   "/connection",
+  authMiddleware,
   controller.disconnect.bind(controller),
 );
 
