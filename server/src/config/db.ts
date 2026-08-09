@@ -1,7 +1,6 @@
 import "dotenv/config";
 
 import { PrismaPg } from "@prisma/adapter-pg";
-
 import { PrismaClient } from "../generated/prisma/client";
 
 import { logger } from "../utils/logger";
@@ -11,20 +10,30 @@ const databaseUrl =
 
 if (!databaseUrl) {
   throw new Error(
-    "DATABASE_URL is not defined in .env",
+    "DATABASE_URL is not defined",
   );
 }
 
-/*
- * Prisma 7 + PostgreSQL
- *
- * DATABASE_URL จะใช้ connection string
- * ของ Supabase PostgreSQL
- */
 const adapter =
   new PrismaPg({
     connectionString:
       databaseUrl,
+
+    /*
+     * สำคัญสำหรับ Railway
+     * อย่าปล่อยให้ DB connection ค้างไม่มีกำหนด
+     */
+    connectionTimeoutMillis:
+      10_000,
+
+    idleTimeoutMillis:
+      30_000,
+
+    /*
+     * เริ่มเล็กก่อนเพราะมี Supabase pooler อยู่แล้ว
+     */
+    max:
+      5,
   });
 
 export const prisma =
@@ -35,6 +44,10 @@ export const prisma =
 export const connectDB =
   async (): Promise<void> => {
     try {
+      logger.info(
+        "⏳ Connecting to PostgreSQL...",
+      );
+
       await prisma.$connect();
 
       logger.info(
